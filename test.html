@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game News API Tester</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .article {
+        border: 1px solid #ccc;
+        margin: 10px 0;
+        padding: 15px;
+        border-radius: 5px;
+      }
+      .loading {
+        color: #666;
+        font-style: italic;
+      }
+      .error {
+        color: red;
+      }
+      .status {
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #f0f0f0;
+        border-radius: 5px;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 10px 0;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Game News API Tester</h1>
+
+    <div>
+      <button onclick="checkHealth()">Check Health</button>
+      <button onclick="getNews()">Get News</button>
+    </div>
+
+    <div id="health" class="status"></div>
+    <div id="news"></div>
+
+    <script>
+      const API_URL = "http://localhost:3000";
+
+      async function checkHealth() {
+        const healthDiv = document.getElementById("health");
+        healthDiv.innerHTML = '<span class="loading">Checking health...</span>';
+
+        try {
+          const response = await fetch(`${API_URL}/health`);
+          const data = await response.json();
+          healthDiv.innerHTML = `
+                    <strong>Health Status:</strong> ${data.status}<br>
+                    <strong>Timestamp:</strong> ${data.timestamp}
+                `;
+        } catch (error) {
+          healthDiv.innerHTML = `<span class="error">Error checking health: ${error.message}</span>`;
+        }
+      }
+
+      async function getNews() {
+        const newsDiv = document.getElementById("news");
+        newsDiv.innerHTML =
+          '<span class="loading">Fetching news... This may take a few minutes...</span>';
+
+        try {
+          const response = await fetch(`${API_URL}/api/news`);
+          const data = await response.json();
+
+          let html = `<h2>News Results</h2>
+                           <div class="status">
+                             <strong>Status:</strong> ${data.status}<br>
+                             <strong>Message:</strong> ${data.message}
+                           </div>`;
+
+          if (data.data && data.data.length > 0) {
+            html += data.data
+              .map(
+                (article) => `
+                        <div class="article">
+                            <h3>${article.title}</h3>
+                            <p>${article.summary}</p>
+                            <a href="${article.sourceUrl}" target="_blank">Read original article</a>
+                        </div>
+                    `
+              )
+              .join("");
+          } else {
+            html += "<p>No articles found.</p>";
+          }
+
+          newsDiv.innerHTML = html;
+        } catch (error) {
+          newsDiv.innerHTML = `<span class="error">Error fetching news: ${error.message}</span>`;
+        }
+      }
+
+      // Check health on page load
+      checkHealth();
+    </script>
+  </body>
+</html>
