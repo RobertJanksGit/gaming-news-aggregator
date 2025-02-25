@@ -43,6 +43,7 @@ const RSS_FEEDS = [
 let articleCache = {
   timestamp: null,
   data: null,
+  isProcessing: false,
 };
 
 // Get articles from RSS feeds
@@ -464,18 +465,72 @@ async function processGameNews() {
 
 // API Routes
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ status: "ok" });
+});
+
+app.get("/", (req, res) => {
+  res.json({
+    status: "ok",
+    message: "Welcome to the Gaming News API",
+    endpoints: {
+      "/health": "Check API health",
+      "/api/news": "Get today's gaming news",
+    },
+  });
 });
 
 app.get("/api/news", async (req, res) => {
   try {
-    const result = await processGameNews();
-    res.json(result);
+    // Check if we have valid cached data (less than 1 hour old)
+    const now = new Date();
+    if (articleCache.data && articleCache.timestamp) {
+      const cacheAge = now - articleCache.timestamp;
+      if (cacheAge < 3600000) {
+        // 1 hour in milliseconds
+        return res.json(articleCache.data);
+      }
+    }
+
+    // If already processing, return status
+    if (articleCache.isProcessing) {
+      return res.json({
+        status: "processing",
+        message:
+          "News articles are being processed. Please try again in a few minutes.",
+      });
+    }
+
+    // Start processing in the background
+    if (!articleCache.isProcessing) {
+      articleCache.isProcessing = true;
+      processGameNews()
+        .then((result) => {
+          articleCache.data = result;
+          articleCache.timestamp = new Date();
+          articleCache.isProcessing = false;
+        })
+        .catch((err) => {
+          console.error("Error processing game news:", err);
+          articleCache.isProcessing = false;
+        });
+    }
+
+    // Return appropriate response
+    if (articleCache.data) {
+      // Return old cache while processing new data
+      res.json(articleCache.data);
+    } else {
+      res.json({
+        status: "processing",
+        message:
+          "Initial news processing in progress. Please try again in a few minutes.",
+      });
+    }
   } catch (error) {
+    console.error("Error in /api/news endpoint:", error);
     res.status(500).json({
-      status: "error",
-      message: "Internal server error",
-      error: error.message,
+      error: "Internal server error",
+      message: "An error occurred while processing the news",
     });
   }
 });
@@ -489,7 +544,43 @@ cron.schedule("0 20 * * *", async () => {
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log(`API endpoints:`);
-  console.log(`- GET /health: Check server status`);
-  console.log(`- GET /api/news: Get today's summarized game news`);
+  console.log("API endpoints:");
+  console.log("- GET /health: Check server status");
+  console.log("- GET /api/news: Get today's summarized game news");
+
+  // Schedule background refresh every hour
+  cron.schedule("0 * * * *", async () => {
+    console.log("Starting scheduled news refresh...");
+    try {
+      if (!articleCache.isProcessing) {
+        articleCache.isProcessing = true;
+        const result = await processGameNews();
+        articleCache.data = result;
+        articleCache.timestamp = new Date();
+        articleCache.isProcessing = false;
+        console.log("Scheduled news refresh completed successfully");
+      } else {
+        console.log("Skipping scheduled refresh - already processing");
+      }
+    } catch (error) {
+      console.error("Error in scheduled news refresh:", error);
+      articleCache.isProcessing = false;
+    }
+  });
+
+  // Initial processing
+  if (!articleCache.isProcessing && !articleCache.data) {
+    articleCache.isProcessing = true;
+    processGameNews()
+      .then((result) => {
+        articleCache.data = result;
+        articleCache.timestamp = new Date();
+        articleCache.isProcessing = false;
+        console.log("Initial news processing completed");
+      })
+      .catch((err) => {
+        console.error("Error in initial news processing:", err);
+        articleCache.isProcessing = false;
+      });
+  }
 });
