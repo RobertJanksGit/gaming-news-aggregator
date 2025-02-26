@@ -52,11 +52,12 @@ async function getLatestArticles() {
   console.log("Starting to fetch articles from RSS feeds...");
 
   const currentDate = new Date();
-  const startOfDay = new Date(currentDate);
-  startOfDay.setHours(0, 0, 0, 0);
+  const twentyFourHoursAgo = new Date(
+    currentDate.getTime() - 24 * 60 * 60 * 1000
+  );
 
   console.log(`Current time: ${currentDate.toISOString()}`);
-  console.log(`Start of day: ${startOfDay.toISOString()}`);
+  console.log(`24 hours ago: ${twentyFourHoursAgo.toISOString()}`);
 
   for (const feedUrl of RSS_FEEDS) {
     try {
@@ -76,13 +77,13 @@ async function getLatestArticles() {
       const filteredArticles = feed.items
         .filter((item) => {
           const pubDate = new Date(item.pubDate);
-          const isToday = pubDate >= startOfDay;
-          if (isToday) {
+          const isRecent = pubDate >= twentyFourHoursAgo;
+          if (isRecent) {
             console.log(
               `Including article: ${item.title} (${pubDate.toISOString()})`
             );
           }
-          return isToday;
+          return isRecent;
         })
         .map((item) => ({
           title: item.title,
@@ -93,7 +94,7 @@ async function getLatestArticles() {
         }));
 
       console.log(
-        `Found ${filteredArticles.length} articles from today on ${
+        `Found ${filteredArticles.length} articles from last 24 hours on ${
           feed.title || feedUrl
         }`
       );
