@@ -127,7 +127,7 @@ async function getLatestArticles() {
 }
 
 // Filter interesting articles using OpenAI
-async function filterArticles(articles, numToSelect = 5) {
+async function filterArticles(articles, numToSelect = 10) {
   if (articles.length === 0) return [];
 
   try {
