@@ -127,37 +127,68 @@ async function getLatestArticles() {
 }
 
 // Filter interesting articles using OpenAI
-async function filterArticles(articles, numToSelect = 6) {
+async function filterArticles(articles, numToSelect = 10) {
   if (articles.length === 0) return [];
 
   try {
-    const articleList = articles
-      .map(
-        (article) =>
-          `Title: ${article.title}\nSummary: ${article.description}\nURL: ${article.link}`
-      )
-      .join("\n\n");
+    // Split the desired number into two API calls
+    const numPerCall = Math.ceil(numToSelect / 2);
+    const results = [];
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories for the gaming community. Choose articles that are likely to spark interest, debate, or excitement among gamers, regardless of the source's size or popularity. Look for stories that cover unique gameplay mechanics, community reactions, indie game developments, retro gaming, or significant industry trends. Ensure a diverse selection of sources, including smaller or niche gaming sites.",
-        },
-        {
-          role: "user",
-          content: `Select the ${numToSelect} most compelling articles from the list below. Return ONLY a JSON array of objects with 'title' and 'url' properties. Do not include any additional text or explanations.\n\n${articleList}`,
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 500,
-    });
+    // Function to make a single API call for filtering
+    async function filterBatch(articleBatch, batchSize) {
+      const articleList = articleBatch
+        .map(
+          (article) =>
+            `Title: ${article.title}\nSummary: ${article.description}\nURL: ${article.link}`
+        )
+        .join("\n\n");
 
-    const result = JSON.parse(response.choices[0].message.content);
-    return result.articles || [];
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories for the gaming community. Choose articles that are likely to spark interest, debate, or excitement among gamers, regardless of the source's size or popularity. Look for stories that cover unique gameplay mechanics, community reactions, indie game developments, retro gaming, or significant industry trends. Ensure a diverse selection of sources, including smaller or niche gaming sites.",
+          },
+          {
+            role: "user",
+            content: `Select the ${batchSize} most compelling articles from the list below. Return ONLY a JSON array of objects with 'title' and 'url' properties. Do not include any additional text or explanations.\n\n${articleList}`,
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      const result = JSON.parse(response.choices[0].message.content);
+      return result.articles || [];
+    }
+
+    // Split articles into two halves
+    const midPoint = Math.ceil(articles.length / 2);
+    const firstHalf = articles.slice(0, midPoint);
+    const secondHalf = articles.slice(midPoint);
+
+    console.log(`Processing first batch of ${numPerCall} articles...`);
+    const firstBatchResults = await filterBatch(firstHalf, numPerCall);
+
+    // Add a small delay between calls to avoid rate limits
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    console.log(`Processing second batch of ${numPerCall} articles...`);
+    const secondBatchResults = await filterBatch(secondHalf, numPerCall);
+
+    // Combine results
+    results.push(...firstBatchResults, ...secondBatchResults);
+
+    // Remove any duplicates (just in case)
+    const uniqueResults = Array.from(
+      new Set(results.map((item) => item.url))
+    ).map((url) => results.find((item) => item.url === url));
+
+    return uniqueResults;
   } catch (err) {
     console.error("Error filtering articles with OpenAI:", err);
     return [];
