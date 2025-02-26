@@ -154,7 +154,7 @@ async function filterArticles(articles, numToSelect = 10) {
           },
           {
             role: "user",
-            content: `Select the ${batchSize} most compelling articles from the list below. Return ONLY a JSON array of objects with 'title' and 'url' properties. Do not include any additional text or explanations.\n\n${articleList}`,
+            content: `Select the ${batchSize} most compelling articles that provide substantial gaming news or insights from the list below. Exclude articles that are primarily promotional or about the website itself without meaningful gaming content. Return ONLY a JSON array of objects with 'title' and 'url' properties. Do not include any additional text or explanations.\n\n${articleList}`,
           },
         ],
         response_format: { type: "json_object" },
