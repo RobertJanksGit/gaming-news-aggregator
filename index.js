@@ -481,15 +481,7 @@ app.get("/", (req, res) => {
 
 app.get("/api/news", async (req, res) => {
   try {
-    // Check if we have valid cached data (less than 1 hour old)
-    const now = new Date();
-    if (articleCache.data && articleCache.timestamp) {
-      const cacheAge = now - articleCache.timestamp;
-      if (cacheAge < 3600000) {
-        // 1 hour in milliseconds
-        return res.json(articleCache.data);
-      }
-    }
+    console.log("Received request for /api/news");
 
     // If already processing, return status
     if (articleCache.isProcessing) {
@@ -500,45 +492,25 @@ app.get("/api/news", async (req, res) => {
       });
     }
 
-    // Start processing in the background
-    if (!articleCache.isProcessing) {
-      articleCache.isProcessing = true;
-      processGameNews()
-        .then((result) => {
-          articleCache.data = result;
-          articleCache.timestamp = new Date();
-          articleCache.isProcessing = false;
-        })
-        .catch((err) => {
-          console.error("Error processing game news:", err);
-          articleCache.isProcessing = false;
-        });
-    }
+    // Start processing
+    console.log("Starting news processing...");
+    articleCache.isProcessing = true;
 
-    // Return appropriate response
-    if (articleCache.data) {
-      // Return old cache while processing new data
-      res.json(articleCache.data);
-    } else {
-      res.json({
-        status: "processing",
-        message:
-          "Initial news processing in progress. Please try again in a few minutes.",
-      });
-    }
+    const result = await processGameNews();
+    articleCache.data = result;
+    articleCache.timestamp = new Date();
+    articleCache.isProcessing = false;
+
+    console.log("News processing completed");
+    res.json(result);
   } catch (error) {
     console.error("Error in /api/news endpoint:", error);
+    articleCache.isProcessing = false;
     res.status(500).json({
       error: "Internal server error",
       message: "An error occurred while processing the news",
     });
   }
-});
-
-// Schedule the job to run daily at 8 PM
-cron.schedule("0 20 * * *", async () => {
-  console.log("Running scheduled news processing...");
-  await processGameNews();
 });
 
 // Start the server
@@ -547,40 +519,4 @@ app.listen(PORT, () => {
   console.log("API endpoints:");
   console.log("- GET /health: Check server status");
   console.log("- GET /api/news: Get today's summarized game news");
-
-  // Schedule background refresh every hour
-  cron.schedule("0 * * * *", async () => {
-    console.log("Starting scheduled news refresh...");
-    try {
-      if (!articleCache.isProcessing) {
-        articleCache.isProcessing = true;
-        const result = await processGameNews();
-        articleCache.data = result;
-        articleCache.timestamp = new Date();
-        articleCache.isProcessing = false;
-        console.log("Scheduled news refresh completed successfully");
-      } else {
-        console.log("Skipping scheduled refresh - already processing");
-      }
-    } catch (error) {
-      console.error("Error in scheduled news refresh:", error);
-      articleCache.isProcessing = false;
-    }
-  });
-
-  // Initial processing
-  if (!articleCache.isProcessing && !articleCache.data) {
-    articleCache.isProcessing = true;
-    processGameNews()
-      .then((result) => {
-        articleCache.data = result;
-        articleCache.timestamp = new Date();
-        articleCache.isProcessing = false;
-        console.log("Initial news processing completed");
-      })
-      .catch((err) => {
-        console.error("Error in initial news processing:", err);
-        articleCache.isProcessing = false;
-      });
-  }
 });
