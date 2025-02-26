@@ -361,7 +361,7 @@ async function summarizeArticle(fullText, url) {
         },
         {
           role: "user",
-          content: `Create a final summary and catchy title from these combined article summaries. Include a reference to the source (${url}). Return ONLY a JSON object with 'title' and 'summary' properties.\n\n${combinedSummary}`,
+          content: `Create a final summary and catchy title from these combined article summaries. Return ONLY a JSON object with 'title' and 'summary' properties.\n\n${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
