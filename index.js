@@ -51,6 +51,13 @@ async function getLatestArticles() {
   const allArticles = [];
   console.log("Starting to fetch articles from RSS feeds...");
 
+  const currentDate = new Date();
+  const startOfDay = new Date(currentDate);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  console.log(`Current time: ${currentDate.toISOString()}`);
+  console.log(`Start of day: ${startOfDay.toISOString()}`);
+
   for (const feedUrl of RSS_FEEDS) {
     try {
       console.log(`\nAttempting to parse feed: ${feedUrl}`);
@@ -58,21 +65,31 @@ async function getLatestArticles() {
       console.log(`Successfully parsed feed: ${feedUrl}`);
       console.log(`Found ${feed.items.length} total items in feed`);
 
-      const currentDate = new Date();
-      const startOfDay = new Date(currentDate.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(currentDate.setHours(23, 59, 59, 999));
+      // Log the first few items' dates for debugging
+      console.log("\nSample article dates from feed:");
+      feed.items.slice(0, 3).forEach((item) => {
+        console.log(`Title: ${item.title}`);
+        console.log(`Published: ${item.pubDate}`);
+        console.log(`Parsed date: ${new Date(item.pubDate).toISOString()}\n`);
+      });
 
       const filteredArticles = feed.items
         .filter((item) => {
           const pubDate = new Date(item.pubDate);
-          return pubDate >= startOfDay && pubDate <= endOfDay;
+          const isToday = pubDate >= startOfDay;
+          if (isToday) {
+            console.log(
+              `Including article: ${item.title} (${pubDate.toISOString()})`
+            );
+          }
+          return isToday;
         })
         .map((item) => ({
           title: item.title,
           description: item.contentSnippet || item.description || "",
           link: item.link,
           pubDate: new Date(item.pubDate),
-          source: feed.title || new URL(feedUrl).hostname, // Add source information
+          source: feed.title || new URL(feedUrl).hostname,
         }));
 
       console.log(
@@ -95,15 +112,12 @@ async function getLatestArticles() {
   console.log(`Total articles found: ${allArticles.length}`);
   console.log(`Unique articles after deduplication: ${uniqueArticles.length}`);
 
-  // Log articles by source
-  const sourceBreakdown = uniqueArticles.reduce((acc, article) => {
-    acc[article.source] = (acc[article.source] || 0) + 1;
-    return acc;
-  }, {});
-
-  console.log("\nArticles by source:");
-  Object.entries(sourceBreakdown).forEach(([source, count]) => {
-    console.log(`${source}: ${count} articles`);
+  // Log articles by source with their dates
+  console.log("\nArticles by source with dates:");
+  uniqueArticles.forEach((article) => {
+    console.log(
+      `${article.source}: ${article.title} (${article.pubDate.toISOString()})`
+    );
   });
 
   return uniqueArticles;
