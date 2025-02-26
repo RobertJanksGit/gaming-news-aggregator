@@ -37,6 +37,8 @@ const RSS_FEEDS = [
   "https://www.pcgamer.com/rss", // PC Gamer feed
   "https://www.rockpapershotgun.com/feed", // Rock Paper Shotgun feed
   "https://www.vg247.com/feed", // VG247 feed
+  "https://automaton-media.com/en/feed/", // Automaton feed
+  "https://www.videogameschronicle.com/feed/", // Video Games Chronicle feed
 ];
 
 // Cache for storing processed articles
@@ -142,11 +144,11 @@ async function filterArticles(articles, numToSelect = 5) {
         {
           role: "system",
           content:
-            "You are a video game news curator. Select the most interesting and impactful gaming news stories.",
+            "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories for the gaming community. Choose articles that are likely to spark interest, debate, or excitement among gamers, regardless of the source's size or popularity. Look for stories that cover unique gameplay mechanics, community reactions, indie game developments, retro gaming, or significant industry trends. Ensure a diverse selection of sources, including smaller or niche gaming sites.",
         },
         {
           role: "user",
-          content: `Select the ${numToSelect} most interesting articles from this list. Return ONLY a JSON array of objects with 'title' and 'url' properties. Choose articles that are most impactful or newsworthy.\n\n${articleList}`,
+          content: `Select the ${numToSelect} most compelling articles from the list below. Return ONLY a JSON array of objects with 'title' and 'url' properties. Do not include any additional text or explanations.\n\n${articleList}`,
         },
       ],
       response_format: { type: "json_object" },
