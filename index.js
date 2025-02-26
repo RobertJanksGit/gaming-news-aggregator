@@ -39,6 +39,7 @@ const RSS_FEEDS = [
   "https://www.vg247.com/feed", // VG247 feed
   "https://automaton-media.com/en/feed/", // Automaton feed
   "https://www.videogameschronicle.com/feed/", // Video Games Chronicle feed
+  "https://nintendoeverything.com/feed", // Nintendo Everything feed
 ];
 
 // Cache for storing processed articles
