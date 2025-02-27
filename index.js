@@ -389,11 +389,11 @@ async function summarizeArticle(fullText, url) {
         {
           role: "system",
           content:
-            "You are a video game news summarizer. Your role is to create engaging, human-sounding summaries with catchy titles based on provided article summaries.",
+            "You are a video game news summarizer. Your role is to create engaging summaries with catchy titles based on provided article summaries. Use a neutral, reporting-style tone and ensure the content is optimized for SEO by naturally incorporating relevant keywords.",
         },
         {
           role: "user",
-          content: `Create a final summary and a catchy title based on this information. The summary should be engaging, written in a conversational tone, and highlight the most important points. Include relevant keywords in both the title and summary for SEO. Return only a JSON object with 'title' and 'summary' properties.\n\n${combinedSummary}`,
+          content: `Create a final summary that serves as a roundup of the key points from these article summaries, presenting them as recent developments in the video game industry. Use a neutral, reporting-style tone, and ensure the summary is concise yet informative, highlighting the most significant news items. Include relevant keywords naturally for SEO. Also, create a catchy title that reflects the roundup nature of the summary and incorporates relevant keywords. Return only a JSON object with 'title' and 'summary' properties.\n\n${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
