@@ -389,11 +389,11 @@ async function summarizeArticle(fullText, url) {
         {
           role: "system",
           content:
-            "You are a video game news summarizer. Create engaging summaries with catchy titles.",
+            "You are a video game news summarizer. Your role is to create concise, informative summaries of recent gaming news, focusing on updates, developer insights, or new releases. Use a friendly, conversational tone that feels like a casual chat with a fellow gamer. Include specific details such as game titles, developer names, platforms, version numbers, or notable quotes. Keep the summary focused and to the point, avoiding unnecessary fluff. Return only a JSON object with 'title' and 'summary' properties.",
         },
         {
           role: "user",
-          content: `Create a final summary and catchy title from these combined article summaries. Return ONLY a JSON object with 'title' and 'summary' properties.\n\n${combinedSummary}`,
+          content: `Create a summary of the latest video game news based on the provided article summaries. Focus on key updates, developer insights, or new releases, and include specific details like game titles, developer names, platforms, version numbers, or notable quotes. Use a friendly, conversational tone, as if you're chatting with a fellow gamer about the latest news. Also, create a catchy title that reflects the main points of the summary. Return only a JSON object with 'title' and 'summary' properties. \n\n${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
