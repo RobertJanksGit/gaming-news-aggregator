@@ -145,26 +145,43 @@ async function filterArticles(articles, numToSelect = 10) {
         )
         .join("\n\n");
 
+      console.log(`Sending batch of ${articleBatch.length} articles to OpenAI`);
+
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
             content:
-              "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories for the gaming community. Choose articles that are likely to spark interest, debate, or excitement among gamers, regardless of the source's size or popularity. Look for stories that cover unique gameplay mechanics, community reactions, indie game developments, retro gaming, or significant industry trends. Ensure a diverse selection of sources, including smaller or niche gaming sites.",
+              "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories. Return a JSON array of objects containing the most interesting articles.",
           },
           {
             role: "user",
-            content: `Select the ${batchSize} most compelling articles that provide substantial gaming news or insights from the list below. Exclude articles that are primarily promotional or about the website itself without meaningful gaming content. Return ONLY a JSON array of objects with 'title' and 'url' properties. Do not include any additional text or explanations.\n\n${articleList}`,
+            content: `Select the ${batchSize} most compelling gaming news articles from this list. Return a JSON object with an 'articles' array containing objects with 'title' and 'url' properties for each selected article.\n\n${articleList}`,
           },
         ],
         response_format: { type: "json_object" },
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 1000,
       });
 
-      const result = JSON.parse(response.choices[0].message.content);
-      return result.articles || [];
+      console.log(
+        "OpenAI Response:",
+        JSON.stringify(response.choices[0].message.content, null, 2)
+      );
+
+      try {
+        const result = JSON.parse(response.choices[0].message.content);
+        if (!result.articles || !Array.isArray(result.articles)) {
+          console.error("Invalid response format from OpenAI:", result);
+          return [];
+        }
+        return result.articles;
+      } catch (err) {
+        console.error("Error parsing OpenAI response:", err);
+        console.error("Raw response:", response.choices[0].message.content);
+        return [];
+      }
     }
 
     // Split articles into two halves
@@ -174,12 +191,14 @@ async function filterArticles(articles, numToSelect = 10) {
 
     console.log(`Processing first batch of ${numPerCall} articles...`);
     const firstBatchResults = await filterBatch(firstHalf, numPerCall);
+    console.log(`First batch results: ${firstBatchResults.length} articles`);
 
     // Add a small delay between calls to avoid rate limits
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     console.log(`Processing second batch of ${numPerCall} articles...`);
     const secondBatchResults = await filterBatch(secondHalf, numPerCall);
+    console.log(`Second batch results: ${secondBatchResults.length} articles`);
 
     // Combine results
     results.push(...firstBatchResults, ...secondBatchResults);
@@ -189,9 +208,16 @@ async function filterArticles(articles, numToSelect = 10) {
       new Set(results.map((item) => item.url))
     ).map((url) => results.find((item) => item.url === url));
 
+    console.log(`Total filtered articles: ${uniqueResults.length}`);
     return uniqueResults;
   } catch (err) {
     console.error("Error filtering articles with OpenAI:", err);
+    if (err.response) {
+      console.error("OpenAI API Error:", {
+        status: err.response.status,
+        data: err.response.data,
+      });
+    }
     return [];
   }
 }
@@ -346,6 +372,8 @@ async function summarizeArticle(fullText, url) {
       chunks.push(fullText.slice(i, i + chunkSize));
     }
 
+    console.log(`Summarizing article in ${chunks.length} chunks`);
+
     // Get initial summary for each chunk
     const chunkSummaries = [];
     for (let i = 0; i < chunks.length; i++) {
@@ -357,15 +385,15 @@ async function summarizeArticle(fullText, url) {
           {
             role: "system",
             content:
-              "You are a video game news summarizer. Create concise summaries of article segments.",
+              "You are a video game news summarizer. Create concise, engaging summaries that capture the key points and maintain the original tone.",
           },
           {
             role: "user",
-            content: `Summarize this article segment. Keep it brief and focused on key points only.\n\n${chunks[i]}`,
+            content: `Summarize this article segment. Focus on key information and maintain an engaging tone.\n\n${chunks[i]}`,
           },
         ],
         temperature: 0.7,
-        max_tokens: 250,
+        max_tokens: 500,
       });
 
       const summary = response.choices[0].message.content;
@@ -379,9 +407,11 @@ async function summarizeArticle(fullText, url) {
 
     // Combine chunk summaries and create final summary with title
     const combinedSummary = chunkSummaries.join(" ");
+    console.log("Combined summary length:", combinedSummary.length);
 
     // Detect platforms from the combined summary
     const platforms = await detectPlatforms(combinedSummary);
+    console.log("Detected platforms:", platforms);
 
     const finalResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -389,25 +419,46 @@ async function summarizeArticle(fullText, url) {
         {
           role: "system",
           content:
-            "You are a video game news summarizer. Create engaging summaries with catchy titles.",
+            "You are a video game news summarizer. Create an engaging final summary with a catchy title that captures attention while maintaining accuracy.",
         },
         {
           role: "user",
-          content: `Write a concise final summary and catchy title from these combined article summaries. Return ONLY a JSON object with 'title' and 'summary' properties.\n\n${combinedSummary}`,
+          content: `Create a final summary and catchy title from this text. Return a JSON object with 'title' and 'summary' properties. The title should be attention-grabbing but accurate. The summary should be concise and engaging.\n\n${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 1000,
     });
 
-    const summary = JSON.parse(finalResponse.choices[0].message.content);
-    return {
-      ...summary,
-      platforms: platforms,
-    };
+    console.log(
+      "Final summary response:",
+      JSON.stringify(finalResponse.choices[0].message.content, null, 2)
+    );
+
+    try {
+      const summary = JSON.parse(finalResponse.choices[0].message.content);
+      if (!summary.title || !summary.summary) {
+        console.error("Invalid summary format:", summary);
+        return null;
+      }
+      return {
+        ...summary,
+        platforms: platforms,
+      };
+    } catch (err) {
+      console.error("Error parsing summary response:", err);
+      console.error("Raw response:", finalResponse.choices[0].message.content);
+      return null;
+    }
   } catch (err) {
     console.error("Error summarizing article with OpenAI:", err);
+    if (err.response) {
+      console.error("OpenAI API Error:", {
+        status: err.response.status,
+        data: err.response.data,
+      });
+    }
     return null;
   }
 }
