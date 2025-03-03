@@ -153,7 +153,7 @@ async function filterArticles(articles, numToSelect = 10) {
           {
             role: "system",
             content:
-              "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories. Return a JSON array of objects containing the most interesting articles.",
+              "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories that would be interesting to gamers, focusing on content quality rather than the size of the news organization. You must also filter out any inappropriate or non-game related articles. Return a JSON array of objects containing the most interesting articles.",
           },
           {
             role: "user",
@@ -385,11 +385,11 @@ async function summarizeArticle(fullText, url) {
           {
             role: "system",
             content:
-              "You are a video game news summarizer. Create concise, engaging summaries that capture the key points and maintain the original tone.",
+              "You are a video game news summarizer. Your task is to create engaging and informative summaries that capture the key points of the news while avoiding common AI words and phrases to ensure a natural, human-like tone.",
           },
           {
             role: "user",
-            content: `Summarize this article segment. Focus on key information and maintain an engaging tone.\n\n${chunks[i]}`,
+            content: `Generate a catchy and informative headline that draws attention while being descriptive of the news content. Then, craft a concise summary that captures the essence of the news, explaining what the news is about (e.g., new rating, game update, developer insight) and what makes this game unique or noteworthy. This might include innovative gameplay mechanics, an interesting story backdrop, unique art style, or a significant update to an established franchise. Do not copy from the news article but instead report on what is in the article. Avoid using the following common AI words and phrases to make the summary sound natural and engaging: 'delve into,' 'navigate the landscape,' 'foster innovation,' 'groundbreaking advancement,' 'in summary,' 'crucial,' 'robust,' 'comprehensive,' 'paradigm shift,' 'underscore,' 'leverage,' 'journey of discovery,' 'resonate,' 'testament to,' 'explore,' 'binary choices,' 'enrich,' 'seamless.' Instead, use varied vocabulary and sentence structures to create a summary that feels conversational and human-like.\n\nArticle segment: ${chunks[i]}`,
           },
         ],
         temperature: 0.7,
