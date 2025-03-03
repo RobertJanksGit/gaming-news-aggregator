@@ -419,11 +419,11 @@ async function summarizeArticle(fullText, url) {
         {
           role: "system",
           content:
-            "You are a video game news summarizer. Create an engaging final summary with a catchy title that captures attention while maintaining accuracy.",
+            "You are a video game news summarizer. Your task is to create engaging and informative summaries that capture the key points of the news while avoiding common AI words and phrases to ensure a natural, human-like tone.",
         },
         {
           role: "user",
-          content: `Create a final summary and catchy title from this text. Return a JSON object with 'title' and 'summary' properties. The title should be attention-grabbing but accurate. The summary should be concise and engaging.\n\n${combinedSummary}`,
+          content: `Create a final summary and catchy and informative headline that draws attention while being descriptive of the news content. Then, craft a concise summary that captures the essence of the news, explaining what the news is about (e.g., new rating, game update, developer insight) and what makes this game unique or noteworthy. This might include innovative gameplay mechanics, an interesting story backdrop, unique art style, or a significant update to an established franchise. Do not copy from the news article but instead report on what is in the article. Avoid using the following common AI words and phrases to make the summary sound natural and engaging: 'delve into,' 'navigate the landscape,' 'foster innovation,' 'groundbreaking advancement,' 'in summary,' 'crucial,' 'robust,' 'comprehensive,' 'paradigm shift,' 'underscore,' 'leverage,' 'journey of discovery,' 'resonate,' 'testament to,' 'explore,' 'binary choices,' 'enrich,' 'seamless.' Instead, use varied vocabulary and sentence structures to create a summary that feels conversational and human-like. Return a JSON object with 'title' and 'summary' properties. The title should be attention-grabbing but accurate. The summary should be concise and engaging.\n\n${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
