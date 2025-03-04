@@ -183,7 +183,7 @@ async function filterArticles(articles, numToSelect = 10) {
           },
           {
             role: "user",
-            content: `Select the ${batchSize} most compelling gaming news articles from this list. When evaluating, prioritize articles that are likely to generate discussion, such as those about new game releases, updates, controversies, or in-depth analyses. Ensure the selection includes a diverse range of topics and perspectives, giving equal weight to all sources regardless of their size or fame. Return a JSON object with an 'articles' array containing objects with 'title' and 'url' properties for each selected article.\n\n${articleList}`,
+            content: `Select the ${batchSize} most compelling gaming news articles from the list. Focus on articles likely to spark discussion, such as new game releases, major updates, controversies, or unique features. Ensure the selection covers a diverse range of topics and gaming communities (e.g., Nintendo, PC, console, mobile), avoiding multiple articles about the same event or from the same source. Evaluate each article based on its content and engagement potential, not the source’s reputation. Return a JSON object with an 'articles' array containing objects with 'title' and 'url' properties for each selected article.\n\n${articleList}`,
           },
         ],
         response_format: { type: "json_object" },
