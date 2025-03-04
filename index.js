@@ -40,6 +40,8 @@ const RSS_FEEDS = [
   "https://automaton-media.com/en/feed/", // Automaton feed
   "https://www.videogameschronicle.com/feed/", // Video Games Chronicle feed
   "https://nintendoeverything.com/feed", // Nintendo Everything feed
+  "https://www.nintendolife.com/feeds/latest", // Nintendo Life feed
+  "https://nintendonews.com/api/nn/feed", // Nintendo News feed
 ];
 
 // Cache for storing processed articles
