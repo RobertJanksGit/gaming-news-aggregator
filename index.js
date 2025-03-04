@@ -66,18 +66,42 @@ async function getLatestArticles() {
 
   for (const feedUrl of RSS_FEEDS) {
     try {
-      console.log(`\nAttempting to parse feed: ${feedUrl}`);
+      // Add special logging for Nintendo feeds
+      const isNintendoFeed = feedUrl.toLowerCase().includes("nintendo");
+      if (isNintendoFeed) {
+        console.log(`\n=== Processing Nintendo feed: ${feedUrl} ===`);
+      } else {
+        console.log(`\nAttempting to parse feed: ${feedUrl}`);
+      }
+
       const feed = await parser.parseURL(feedUrl);
       console.log(`Successfully parsed feed: ${feedUrl}`);
       console.log(`Found ${feed.items.length} total items in feed`);
 
-      // Log the first few items' dates for debugging
-      console.log("\nSample article dates from feed:");
-      feed.items.slice(0, 3).forEach((item) => {
-        console.log(`Title: ${item.title}`);
-        console.log(`Published: ${item.pubDate}`);
-        console.log(`Parsed date: ${new Date(item.pubDate).toISOString()}\n`);
-      });
+      // Enhanced logging for Nintendo feeds
+      if (isNintendoFeed) {
+        console.log("\nDetailed Nintendo feed information:");
+        console.log(`Feed title: ${feed.title}`);
+        console.log(
+          `Feed description: ${feed.description || "No description"}`
+        );
+        console.log("\nFirst 5 articles from this Nintendo feed:");
+        feed.items.slice(0, 5).forEach((item, index) => {
+          console.log(`\n[Article ${index + 1}]`);
+          console.log(`Title: ${item.title}`);
+          console.log(`Published: ${item.pubDate}`);
+          console.log(`Parsed date: ${new Date(item.pubDate).toISOString()}`);
+          console.log(`Link: ${item.link}`);
+        });
+      } else {
+        // Regular logging for other feeds
+        console.log("\nSample article dates from feed:");
+        feed.items.slice(0, 3).forEach((item) => {
+          console.log(`Title: ${item.title}`);
+          console.log(`Published: ${item.pubDate}`);
+          console.log(`Parsed date: ${new Date(item.pubDate).toISOString()}\n`);
+        });
+      }
 
       const filteredArticles = feed.items
         .filter((item) => {
@@ -155,11 +179,11 @@ async function filterArticles(articles, numToSelect = 10) {
           {
             role: "system",
             content:
-              "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories that would be interesting to gamers, focusing on content quality rather than the size of the news organization. You must also filter out any inappropriate or non-game related articles. Return a JSON array of objects containing the most interesting articles.",
+              "You are a video game news curator tasked with selecting the most engaging and discussion-worthy gaming news stories for gamers. Focus on the content’s ability to spark discussion and engagement, regardless of the source’s reputation or size. Consider the interests of various gaming communities, including loyal fanbases like Nintendo fans, and aim for a diverse selection of topics and perspectives. Filter out any inappropriate or non-game-related articles. Return a JSON array of objects containing the most interesting articles.",
           },
           {
             role: "user",
-            content: `Select the ${batchSize} most compelling gaming news articles from this list. Return a JSON object with an 'articles' array containing objects with 'title' and 'url' properties for each selected article.\n\n${articleList}`,
+            content: `Select the ${batchSize} most compelling gaming news articles from this list. When evaluating, prioritize articles that are likely to generate discussion, such as those about new game releases, updates, controversies, or in-depth analyses. Ensure the selection includes a diverse range of topics and perspectives, giving equal weight to all sources regardless of their size or fame. Return a JSON object with an 'articles' array containing objects with 'title' and 'url' properties for each selected article.\n\n${articleList}`,
           },
         ],
         response_format: { type: "json_object" },
