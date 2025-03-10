@@ -454,7 +454,7 @@ async function summarizeArticle(fullText, url) {
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 2000,
     });
 
     console.log(
