@@ -439,6 +439,79 @@ async function summarizeArticle(fullText, url) {
     const platforms = await detectPlatforms(combinedSummary);
     console.log("Detected platforms:", platforms);
 
+    const aiPhrases =
+      '"provide a valuable insight",' +
+      '"left an indelible mark",' +
+      '"play a significant role in shaping",' +
+      '"an unwavering commitment",' +
+      '"a testament to",' +
+      '"a paradigm shift",' +
+      '"a pivotal moment",' +
+      '"a profound impact",' +
+      '"a remarkable achievement",' +
+      '"a significant milestone",' +
+      '"a striking resemblance",' +
+      '"a unique perspective",' +
+      '"a wealth of information",' +
+      '"an array of options",' +
+      '"an exceptional example",' +
+      '"an integral part",' +
+      '"an intricate balance",' +
+      '"as we navigate",' +
+      '"at the heart of",' +
+      '"beyond the scope",' +
+      '"by and large",' +
+      '"carefully curated",' +
+      '"deeply resonated",' +
+      '"delve deeper",' +
+      '"elevate the experience",' +
+      '"embark on a journey",' +
+      '"embrace the opportunity",' +
+      '"enhance the understanding",' +
+      '"explore the nuances",' +
+      '"for all intents and purposes",' +
+      '"foster a sense of",' +
+      '"from a holistic perspective",' +
+      '"harness the power",' +
+      '"illuminate the path",' +
+      '"immerse yourself",' +
+      '"in light of",' +
+      '"in the realm of",' +
+      '"in this day and age",' +
+      '"it goes without saying",' +
+      '"it is worth noting",' +
+      '"it\'s important to note",' +
+      '"leverage the potential",' +
+      '"myriad of options",' +
+      '"needless to say",' +
+      '"on the cutting edge",' +
+      '"on the flip side",' +
+      '"pave the way",' +
+      '"paints a picture",' +
+      '"particularly noteworthy",' +
+      '"push the boundaries",' +
+      '"require a careful consideration",' +
+      '"essential to recognize",' +
+      '"validate the finding",' +
+      '"vital role in shaping",' +
+      '"sense of camaraderie",' +
+      '"influence various factors",' +
+      '"make a challenge",' +
+      '"unwavering support",' +
+      '"importance of the address",' +
+      '"a significant step forward",' +
+      '"add an extra layer",' +
+      '"address the root cause",' +
+      '"a profound implication",' +
+      '"contributes to understanding",' +
+      '"beloved",' +
+      '"highlights",' +
+      '"delve into",' +
+      '"navigate the landscape",' +
+      '"foster innovation",' +
+      '"groundbreaking advancement",' +
+      '"in summary"';
+
     const finalResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -449,7 +522,7 @@ async function summarizeArticle(fullText, url) {
         },
         {
           role: "user",
-          content: `Using the news content provided below, craft a catchy and informative headline that grabs attention and reflects the story accurately—keep it under 50 characters. Then, write a concise article summarizing the key details in a few clear paragraphs. **Start directly with the main news content without using introductory phrases like 'Hey gamers!' or 'Hold on to your hats.'** Jump straight into the core information, keeping it short and sharp with simple, everyday language and no extra fluff. To keep it natural and lively, don’t use these overused AI words and phrases: 'beloved', 'highlights,' 'delve into,' 'navigate the landscape,' 'foster innovation,' 'groundbreaking advancement,' 'in summary,' 'crucial,' 'robust,' 'comprehensive,' 'paradigm shift,' 'underscore,' 'leverage,' 'journey of discovery,' 'resonate,' 'testament to,' 'explore,' 'binary choices,' 'enrich,' 'seamless.' Instead, mix up your word choice and sentence shapes to make it feel like a real conversation. Make sure your sentence lengths are varied and not all the same. Mixing in short and long sentences is key. Throw in a personal take or a relatable quip about the news to show you’re genuinely into it. Push hard to make the text super human-like. Aim for top-tier burstiness (0-100 scale) with a mix of short sentences and longer ones. Crank up the perplexity (0-100 scale) so it’s unpredictable. Return a JSON object with 'title' and 'summary' properties.News content: ${combinedSummary}`,
+          content: `Using the news content provided below, craft a catchy and informative headline that grabs attention and reflects the story accurately—keep it under 50 characters. Then, write a concise article summarizing the key details in a few clear paragraphs. **Start directly with the main news content without using introductory phrases like 'Hey gamers!' or 'Hold on to your hats.'** Jump straight into the core information, keeping it short and sharp with simple, everyday language and no extra fluff. To keep it natural and lively, don’t use these overused AI words and phrases: ${aiPhrases}. Instead, mix up your word choice and sentence shapes to make it feel like a real conversation. Make sure your sentence lengths are varied and not all the same. Mixing in short and long sentences is key. Throw in a personal take or a relatable quip about the news to show you’re genuinely into it. Push hard to make the text super human-like. Aim for top-tier burstiness (0-100 scale) with a mix of short sentences and longer ones. Crank up the perplexity (0-100 scale) so it’s unpredictable. Return a JSON object with 'title' and 'summary' properties.News content: ${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
