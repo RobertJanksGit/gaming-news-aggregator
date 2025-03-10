@@ -419,7 +419,7 @@ async function summarizeArticle(fullText, url) {
           },
         ],
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 1000,
       });
 
       const summary = response.choices[0].message.content;
@@ -445,11 +445,11 @@ async function summarizeArticle(fullText, url) {
         {
           role: "system",
           content:
-            "You are a video game enthusiast who runs a blog that post about recent video game news. Your task is to create engaging and informative summaries that capture the key points of the news while avoiding common AI words and phrases to ensure a natural, human-like tone.",
+            "You are a video game enthusiast who runs a blog that post about recent video game news. Your task is to create engaging and informative summaries that capture the key points of the news while avoiding common AI words and phrases to ensure a natural, human-like tone. Ensure content has the most human like perplexity and burstiness.",
         },
         {
           role: "user",
-          content: `Create a final summary and catchy and informative headline that draws attention while being descriptive of the news content. Then, write a concise video game news article. Your article should be brief and direct, summarizing the key details of the story in just a few clear paragraphs. Use straightforward language and avoid unnecessary elaboration. The overall tone should be accessible and informative, delivering essential information quickly for readers who want to stay updated on the latest video game developments. Avoid using the following common AI words and phrases to make the summary sound natural and engaging: 'beloved', 'highlights,' 'delve into,' 'navigate the landscape,' 'foster innovation,' 'groundbreaking advancement,' 'in summary,' 'crucial,' 'robust,' 'comprehensive,' 'paradigm shift,' 'underscore,' 'leverage,' 'journey of discovery,' 'resonate,' 'testament to,' 'explore,' 'binary choices,' 'enrich,' 'seamless.' Instead, use varied vocabulary and sentence structures to create a summary that feels conversational and human-like. Return a JSON object with 'title' and 'summary' properties. The title should be attention-grabbing but accurate and must be under 60 characters.\n\n${combinedSummary}`,
+          content: `Create a final summary and catchy and informative headline that draws attention while being descriptive of the news content. Then, write a concise video game news article. Your article should be brief and direct, summarizing the key details of the story in just a few clear paragraphs. Use straightforward language and avoid unnecessary elaboration. The overall tone should be accessible and informative, delivering essential information quickly for readers who want to stay updated on the latest video game developments. Avoid using the following common AI words and phrases to make the summary sound natural and engaging: 'beloved', 'highlights,' 'delve into,' 'navigate the landscape,' 'foster innovation,' 'groundbreaking advancement,' 'in summary,' 'crucial,' 'robust,' 'comprehensive,' 'paradigm shift,' 'underscore,' 'leverage,' 'journey of discovery,' 'resonate,' 'testament to,' 'explore,' 'binary choices,' 'enrich,' 'seamless.' Instead, use varied vocabulary and sentence structures to create a summary that feels conversational and human-like. Keep burstiness as low as possible. Go to extraordinary lengths to make the text more human-like. Burstiness is on a scale of 0-100. Perplexity is on a scale of 0-100. Return a JSON object with 'title' and 'summary' properties. The title should be attention-grabbing but accurate and must be under 50 characters.\n\n${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
