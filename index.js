@@ -512,7 +512,8 @@ async function summarizeArticle(fullText, url) {
       '"groundbreaking advancement",' +
       '"in summary",' +
       '"shrouded in mystery",' +
-      '"shaping up"';
+      '"shaping up",' +
+      '"making it a treat"';
 
     const finalResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -524,7 +525,7 @@ async function summarizeArticle(fullText, url) {
         },
         {
           role: "user",
-          content: `Using the news content provided below, craft a catchy and informative headline that grabs attention and reflects the story accurately—keep it under 50 characters. Then, write a concise article summarizing the key details in a few clear paragraphs. **Start directly with the main news content without using introductory phrases like 'Hey gamers!' or 'Hold on to your hats.'** Jump straight into the core information, keeping it short and sharp with simple, everyday language and no extra fluff. To keep it natural and lively, don’t use these overused AI words and phrases: ${aiPhrases}. Instead, mix up your word choice and sentence shapes to make it feel like a real conversation. Make sure your sentence lengths are varied and not all the same. Do not go into details about pricing or specs listing as these are common in AI-written product descriptions. Mixing in short and long sentences is key. Throw in a personal take or a relatable quip about the news to show you’re genuinely into it. Push hard to make the text super human-like. Aim for top-tier burstiness (0-100 scale) with a mix of short sentences and longer ones. Crank up the perplexity (0-100 scale) so it’s unpredictable. Return a JSON object with 'title' and 'summary' properties.News content: ${combinedSummary}`,
+          content: `Using the news content provided below, craft a catchy and informative headline that grabs attention and reflects the story accurately—keep it under 50 characters. Then, write a concise article summarizing the key details in a few clear paragraphs. **Start directly with the main news content without using introductory phrases like 'Hey gamers!' or 'Hold on to your hats.'** Jump straight into the core information, keeping it short and sharp with simple, everyday language and no extra fluff. To keep it natural and lively, don’t use these overused AI words and phrases: ${aiPhrases}. Instead, mix up your word choice and sentence shapes to make it feel like a real conversation. Make sure your sentence lengths are varied and not all the same. Do not go into details about pricing or specs listing as these are common in AI-written product descriptions. Do not use generic or promotional tones. Mixing in short and long sentences is key. Throw in a personal take or a relatable quip about the news to show you’re genuinely into it. Push hard to make the text super human-like. Aim for top-tier burstiness (0-100 scale) with a mix of short sentences and longer ones. Crank up the perplexity (0-100 scale) so it’s unpredictable. Return a JSON object with 'title' and 'summary' properties.News content: ${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
