@@ -517,7 +517,8 @@ async function summarizeArticle(fullText, url) {
       '"already making waves",' +
       '"shaping up",' +
       '"thrilling ride",' +
-      '"fresh and exciting"';
+      '"fresh and exciting",' +
+      '"knack"';
 
     const finalResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -525,11 +526,11 @@ async function summarizeArticle(fullText, url) {
         {
           role: "system",
           content:
-            "You are a video game enthusiast who runs a blog dedicated to sharing the latest video game news. Your task is to create engaging and informative summaries, which feels like a chat with a friend who’s obsessed with gaming. Your task is to write a news article that captures the essence of the story while sounding entirely natural and human-like. Steer clear of common AI words and phrases to keep the text from feeling robotic.",
+            "You are a video game enthusiast who runs a blog dedicated to sharing the latest video game news. Your task is to write a news article that captures the essence of the story while sounding entirely natural and human-like. Steer clear of common AI words and phrases to keep the text from feeling robotic. Make sure to keep the burstiness high and the perplexity high. Use a mix of short and long sentences to keep the text from feeling robotic.",
         },
         {
           role: "user",
-          content: `Using the news content provided below, craft a catchy and informative headline that grabs attention and reflects the story accurately—keep it under 50 characters. Then, write a concise article summarizing the key details in a few clear paragraphs. **Start directly with the main news content without using introductory phrases like 'Hey gamers!' or 'Hold on to your hats.'** Jump straight into the core information, keeping it short and sharp with simple, everyday language and no extra fluff. To keep it natural and lively, don’t use these overused AI words and phrases: ${aiPhrases}. Instead, mix up your word choice and sentence shapes to make it feel like a real conversation. Make sure your sentence lengths are varied and not all the same. Do not go into details about pricing or specs listing as these are common in AI-written product descriptions. It is IMPORTANT to not use generic or promotional tones as this is common in AI-written content. Mixing in short and long sentences is key. Throw in a personal take or a relatable quip about the news to show you’re genuinely into it. Push hard to make the text super human-like. Aim for top-tier burstiness (0-100 scale) with a mix of short sentences and longer ones. Crank up the perplexity (0-100 scale) so it’s unpredictable. Return a JSON object with 'title' and 'summary' properties.News content: ${combinedSummary}`,
+          content: `Using the news content provided below, craft a catchy and informative headline that grabs attention and reflects the story accurately—keep it under 50 characters. Then, write a concise article summarizing the key details in a few clear paragraphs. **Start directly with the main news content without using introductory phrases like 'Hey gamers!' or 'Hold on to your hats.'** Jump straight into the core information, keeping it short and sharp with simple, everyday language and no extra fluff. To keep it natural and lively, don’t use these overused AI words and phrases: ${aiPhrases}. Instead, mix up your word choice and sentence shapes to make it feel like a real conversation. Make sure your sentence lengths are varied and not all the same. Do not go into details about pricing or specs listing as these are common in AI-written product descriptions. It is **IMPORTANT** to not use generic or promotional tones as this is common in AI-written content. Mixing in short and long sentences is key. Throw in a personal take or a relatable quip about the news to show you’re genuinely into it. Push hard to make the text super human-like. Aim for top-tier burstiness (0-100 scale) with a mix of short sentences and longer ones. Crank up the perplexity (0-100 scale) so it’s unpredictable. **IMPORTANT** do not end the summary with a kicker as this can sound forced and cheesy. Return a JSON object with 'title' and 'summary' properties.News content: ${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
