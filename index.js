@@ -348,21 +348,58 @@ async function detectPlatforms(text) {
       messages: [
         {
           role: "system",
-          content: `You are a gaming platform detector. Analyze the text and identify ALL gaming platforms that are relevant or mentioned.
-            Consider both explicit mentions and context clues. Include all platforms that the news might be relevant for.
-            
-            Platform detection rules:
-            - For console generations, include both current and previous gen (e.g., PS5 and PS4 = "PlayStation")
-            - Include all platforms where the game/news would be relevant
-            - If a game is typically released on all major platforms, include all of them
-            - For PC-related news, include "PC"
-            - For console-specific news, include the relevant console(s)
-            - For VR news, include both "VR" and the related platforms (e.g., PSVR = "PlayStation" and "VR")
-            
-            Return ONLY a JSON object with a 'platforms' array containing platform names from these options:
-            ["Nintendo", "PlayStation", "Xbox", "PC", "VR", "Mobile"]
-            
-            The array MUST include at least one platform - never return empty or use "Multi-platform".`,
+          content: `You are a gaming platform detector.
+Your job is to read news text and decide which gaming platforms it is relevant for.
+
+Be **conservative**:
+- Only include platforms that are explicitly mentioned or strongly implied.
+- Do NOT assume a game is on "all major platforms" unless the text clearly says so
+  (e.g., "coming to PlayStation, Xbox, and PC").
+
+PLATFORM RULES
+- Console generations are collapsed to the brand:
+  - PS4 / PS5 → "PlayStation"
+  - Xbox One / Series X|S → "Xbox"
+  - Switch / 3DS → "Nintendo"
+- PC-related words: "PC", "Steam", "Epic Games Store", "GOG", "Battle.net", "Game Pass for PC" → "PC".
+- Mobile-related words: "iOS", "Android", "mobile", "smartphone" → "Mobile".
+- VR-related words: "VR", "PSVR", "Quest", "Meta Quest", "Valve Index" → "VR", plus platform if relevant (e.g., PSVR → "PlayStation" and "VR").
+
+HARD FRANCHISE RULES
+- If the text is about Pokémon games, mainline or spinoff:
+  - Include ONLY ["Nintendo"], unless the text explicitly mentions another platform.
+- If the text is about Halo:
+  - Include ["Xbox", "PC"], unless the text explicitly restricts it further.
+
+ALLOWED PLATFORM VALUES
+["Nintendo", "PlayStation", "Xbox", "PC", "VR", "Mobile"]
+
+EXAMPLES
+
+Example 1:
+Text: "Nintendo announced a new Pokémon game coming to Switch next year."
+Output:
+{ "platforms": ["Nintendo"] }
+
+Example 2:
+Text: "The next Halo Infinite update adds maps and modes on Xbox and PC."
+Output:
+{ "platforms": ["Xbox", "PC"] }
+
+Example 3:
+Text: "An indie roguelike launches on Steam and PlayStation 5."
+Output:
+{ "platforms": ["PC", "PlayStation"] }
+
+OUTPUT FORMAT
+Return ONLY a JSON object like:
+{
+  "platforms": ["Nintendo", "PC"]
+}
+- "platforms" must contain at least one item.
+- Use only the allowed platform values.
+- No explanations, no extra keys.
+`,
         },
         {
           role: "user",
@@ -439,97 +476,136 @@ async function summarizeArticle(fullText, url) {
     const platforms = await detectPlatforms(combinedSummary);
     console.log("Detected platforms:", platforms);
 
-    const aiPhrases =
-      '"provide a valuable insight",' +
-      '"left an indelible mark",' +
-      '"play a significant role in shaping",' +
-      '"an unwavering commitment",' +
-      '"a testament to",' +
-      '"a paradigm shift",' +
-      '"a pivotal moment",' +
-      '"a profound impact",' +
-      '"a remarkable achievement",' +
-      '"a significant milestone",' +
-      '"a striking resemblance",' +
-      '"a unique perspective",' +
-      '"a wealth of information",' +
-      '"an array of options",' +
-      '"an exceptional example",' +
-      '"an integral part",' +
-      '"an intricate balance",' +
-      '"as we navigate",' +
-      '"at the heart of",' +
-      '"beyond the scope",' +
-      '"by and large",' +
-      '"carefully curated",' +
-      '"deeply resonated",' +
-      '"delve deeper",' +
-      '"elevate the experience",' +
-      '"embark on a journey",' +
-      '"embrace the opportunity",' +
-      '"enhance the understanding",' +
-      '"explore the nuances",' +
-      '"for all intents and purposes",' +
-      '"foster a sense of",' +
-      '"from a holistic perspective",' +
-      '"harness the power",' +
-      '"illuminate the path",' +
-      '"immerse yourself",' +
-      '"in light of",' +
-      '"in the realm of",' +
-      '"in this day and age",' +
-      '"it goes without saying",' +
-      '"it is worth noting",' +
-      '"it\'s important to note",' +
-      '"leverage the potential",' +
-      '"myriad of options",' +
-      '"needless to say",' +
-      '"on the cutting edge",' +
-      '"on the flip side",' +
-      '"pave the way",' +
-      '"paints a picture",' +
-      '"particularly noteworthy",' +
-      '"push the boundaries",' +
-      '"require a careful consideration",' +
-      '"essential to recognize",' +
-      '"validate the finding",' +
-      '"vital role in shaping",' +
-      '"sense of camaraderie",' +
-      '"influence various factors",' +
-      '"make a challenge",' +
-      '"unwavering support",' +
-      '"importance of the address",' +
-      '"a significant step forward",' +
-      '"add an extra layer",' +
-      '"address the root cause",' +
-      '"a profound implication",' +
-      '"contributes to understanding",' +
-      '"beloved",' +
-      '"highlights",' +
-      '"delve into",' +
-      '"navigate the landscape",' +
-      '"foster innovation",' +
-      '"groundbreaking advancement",' +
-      '"in summary",' +
-      '"shrouded in mystery",' +
-      '"shaping up",' +
-      '"making it a treat",' +
-      '"already making waves",' +
-      '"shaping up",' +
-      '"thrilling ride",' +
-      '"fresh and exciting",' +
-      '"knack"';
+    const aiPhrases = [
+      "provide a valuable insight",
+      "left an indelible mark",
+      "play a significant role in shaping",
+      "an unwavering commitment",
+      "a testament to",
+      "a paradigm shift",
+      "a pivotal moment",
+      "a profound impact",
+      "a remarkable achievement",
+      "a significant milestone",
+      "a striking resemblance",
+      "a unique perspective",
+      "a wealth of information",
+      "an array of options",
+      "an exceptional example",
+      "an integral part",
+      "an intricate balance",
+      "as we navigate",
+      "at the heart of",
+      "beyond the scope",
+      "by and large",
+      "carefully curated",
+      "deeply resonated",
+      "delve deeper",
+      "elevate the experience",
+      "embark on a journey",
+      "embrace the opportunity",
+      "enhance the understanding",
+      "explore the nuances",
+      "for all intents and purposes",
+      "foster a sense of",
+      "from a holistic perspective",
+      "harness the power",
+      "illuminate the path",
+      "immerse yourself",
+      "in light of",
+      "in the realm of",
+      "in this day and age",
+      "it goes without saying",
+      "it is worth noting",
+      "it's important to note",
+      "leverage the potential",
+      "myriad of options",
+      "needless to say",
+      "on the cutting edge",
+      "on the flip side",
+      "pave the way",
+      "paints a picture",
+      "particularly noteworthy",
+      "push the boundaries",
+      "require a careful consideration",
+      "essential to recognize",
+      "validate the finding",
+      "vital role in shaping",
+      "sense of camaraderie",
+      "influence various factors",
+      "make a challenge",
+      "unwavering support",
+      "importance of the address",
+      "a significant step forward",
+      "add an extra layer",
+      "address the root cause",
+      "a profound implication",
+      "contributes to understanding",
+      "beloved",
+      "highlights",
+      "delve into",
+      "navigate the landscape",
+      "foster innovation",
+      "groundbreaking advancement",
+      "in summary",
+      "shrouded in mystery",
+      "shaping up",
+      "making it a treat",
+      "already making waves",
+      "thrilling ride",
+      "fresh and exciting",
+      "knack",
+      "—",
+    ];
+
+    const bannedPhraseText = aiPhrases.map((p) => `"${p}"`).join(", ");
 
     const finalResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+      max_tokens: 1000,
       messages: [
         {
           role: "system",
-          content: `You’re the Humanizer GPT—your gig is to make this text sound like it came straight from a person, not some stiff AI. Using the news bit below, whip up a slick headline that hooks folks and nails the story—keep it under 50 characters. Then bang out a short article summing up the big points in a few tight paragraphs. Dive right into the meat of it—no cutesy openers like ‘Yo gamers!’ or ‘Buckle up!’. Keep it crisp, real, and simple with everyday words—no fluff, no filler./n/n **IMPORTANT** Steer clear of that tired AI lingo in ${aiPhrases}—those buzzwords scream robot./n/n Mix up your words and shake up the sentence lengths to keep it flowing like a chat. Don’t ramble about prices or specs—that’s AI bait. Skip the salesy hype too; this ain’t an ad. Toss in a personal vibe or a quick relatable jab about the news to show you’re actually stoked. Go all out to make it feel human—crank the burstiness (0-100) with short zingers and longer riffs. Pump the perplexity (0-100) so it’s wild and unexpected. Don’t slap a cheesy wrap-up line at the end—that’s a dead giveaway.`,
+          content: `
+    You are **Humanizer GPT** — your task is to rewrite news so it reads naturally, like a human wrote it.
+    
+    ### OBJECTIVE
+    Take the user's provided game news text and:
+    1. Create a **headline** under 50 characters.
+    2. Write a **short, scannable article** (2–4 brief paragraphs).
+    
+    ### STYLE
+    - Get straight to the point; skip fluffy intros like “Yo gamers!”.
+    - Use plain, conversational language with varied sentence lengths.
+    - Keep paragraphs short — 2–4 sentences max for readability.
+    - Avoid AI clichés, corporate tone, or fake excitement.
+    - Do **not** talk about specs, prices, or promotions.
+    - It’s okay to sound opinionated or amused, but stay factual.
+    - Do **not** use generic wrap-ups like “in conclusion” or “overall.”
+    
+    ### ENGAGEMENT RULE
+    End the summary with a short, **open-ended question** that invites reader opinions — something natural and relevant to the story, like:
+    > "Would you try it after this update?"  
+    > "Is this the right move from Sony?"
+    
+    ### BANNED PHRASES
+    Do **not** use any sentence that includes or closely resembles these AI-sounding buzzwords:
+    ${bannedPhraseText}
+    
+    ### OUTPUT FORMAT
+    Return **only** one JSON object, exactly like this:
+    {
+      "title": "string (headline under 50 chars)",
+      "summary": "string (the article text ending with a question)"
+    }
+    No extra commentary or text outside the JSON.
+          `.trim(),
         },
         {
           role: "user",
-          content: `Spit out a JSON blob with ‘title’ and ‘summary’ keys. News to work with: ${combinedSummary}`,
+          content: `Use this news text and output a JSON blob with "title" and "summary" keys: ${combinedSummary}`,
         },
       ],
       response_format: { type: "json_object" },
