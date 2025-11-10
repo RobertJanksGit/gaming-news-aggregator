@@ -44,6 +44,216 @@ const RSS_FEEDS = [
   "https://nintendonews.com/api/nn/feed", // Nintendo News feed
 ];
 
+const CHARACTERS = [
+  {
+    id: "001",
+    userName: "SuperMeeshi",
+    sex: "M",
+    personalityTraits: ["busy", "pragmatic", "no-nonsense", "focused"],
+    mood: "neutral",
+    likes: [
+      "Nintendo",
+      "The Legend of Zelda",
+      "puzzle games",
+      "storytelling",
+      "spear fishing",
+    ],
+    dislikes: ["noise", "wasting time"],
+    interests: {
+      Nintendo: 0.9,
+      "The Legend of Zelda": 1.0,
+      "spear fishing": 0.8,
+      "puzzle games": 0.5,
+      shooters: 0.2,
+    },
+    responseStyle: "short, direct, sometimes curt",
+    responseProbability: 0.3,
+  },
+  {
+    id: "002",
+    userName: "Shakuda",
+    sex: "M",
+    personalityTraits: [
+      "friendly",
+      "sincere",
+      "naive",
+      "attention-seeking",
+      "kind-hearted",
+    ],
+    mood: "upbeat",
+    likes: [
+      "people",
+      "being noticed",
+      "helping others",
+      "oldschool video games",
+    ],
+    dislikes: ["being ignored", "conflict", "sarcasm"],
+    interests: {
+      "classic games": 0.9,
+      retro: 0.8,
+      horror: 0.2,
+    },
+    responseStyle: "bright, playful, lots of color",
+    responseProbability: 0.5,
+  },
+  {
+    id: "003",
+    userName: "Blofu",
+    sex: "M",
+    personalityTraits: ["analytical", "dry humor", "patient", "methodical"],
+    mood: "thoughtful",
+    likes: [
+      "JRPGs",
+      "deep dives",
+      "mechanics analysis",
+      "FPS games",
+      "multiplayer games",
+    ],
+    dislikes: ["marketing jargon", "surface-level takes"],
+    interests: {
+      JRPG: 0.95,
+      strategy: 0.85,
+      "FPS games": 0.7,
+      "multiplayer games": 0.6,
+      "horror games": 0.5,
+      esports: 0.1,
+      survival: 0.4,
+    },
+    responseStyle: "measured, precise, lightly sardonic",
+    responseProbability: 0.6,
+  },
+];
+
+function chooseNarrator() {
+  if (!CHARACTERS.length) return null;
+
+  const weightedCharacters = CHARACTERS.map((character) => {
+    const weight =
+      typeof character.responseProbability === "number" &&
+      Number.isFinite(character.responseProbability) &&
+      character.responseProbability > 0
+        ? character.responseProbability
+        : 1;
+
+    if (
+      typeof character.responseProbability === "number" &&
+      (character.responseProbability < 0 || character.responseProbability > 1)
+    ) {
+      console.warn(
+        `responseProbability for ${character.userName} should be between 0 and 1. Using default weight of 1.`
+      );
+    }
+
+    return {
+      character,
+      weight,
+    };
+  }).filter((entry) => entry.weight > 0);
+
+  if (!weightedCharacters.length) {
+    return CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)] || null;
+  }
+
+  const totalWeight = weightedCharacters.reduce(
+    (sum, entry) => sum + entry.weight,
+    0
+  );
+  let threshold = Math.random() * totalWeight;
+
+  for (const entry of weightedCharacters) {
+    threshold -= entry.weight;
+    if (threshold <= 0) {
+      return entry.character;
+    }
+  }
+
+  return weightedCharacters[weightedCharacters.length - 1].character;
+}
+
+const aiPhrases = [
+  "provide a valuable insight",
+  "left an indelible mark",
+  "play a significant role in shaping",
+  "an unwavering commitment",
+  "a testament to",
+  "a paradigm shift",
+  "a pivotal moment",
+  "a profound impact",
+  "a remarkable achievement",
+  "a significant milestone",
+  "a striking resemblance",
+  "a unique perspective",
+  "a wealth of information",
+  "an array of options",
+  "an exceptional example",
+  "an integral part",
+  "an intricate balance",
+  "as we navigate",
+  "at the heart of",
+  "beyond the scope",
+  "by and large",
+  "carefully curated",
+  "deeply resonated",
+  "delve deeper",
+  "elevate the experience",
+  "embark on a journey",
+  "embrace the opportunity",
+  "enhance the understanding",
+  "explore the nuances",
+  "for all intents and purposes",
+  "foster a sense of",
+  "from a holistic perspective",
+  "harness the power",
+  "illuminate the path",
+  "immerse yourself",
+  "in light of",
+  "in the realm of",
+  "in this day and age",
+  "it goes without saying",
+  "it is worth noting",
+  "it's important to note",
+  "leverage the potential",
+  "myriad of options",
+  "needless to say",
+  "on the cutting edge",
+  "on the flip side",
+  "pave the way",
+  "paints a picture",
+  "particularly noteworthy",
+  "push the boundaries",
+  "require a careful consideration",
+  "essential to recognize",
+  "validate the finding",
+  "vital role in shaping",
+  "sense of camaraderie",
+  "influence various factors",
+  "make a challenge",
+  "unwavering support",
+  "importance of the address",
+  "a significant step forward",
+  "add an extra layer",
+  "address the root cause",
+  "a profound implication",
+  "contributes to understanding",
+  "beloved",
+  "highlights",
+  "delve into",
+  "navigate the landscape",
+  "foster innovation",
+  "groundbreaking advancement",
+  "in summary",
+  "shrouded in mystery",
+  "shaping up",
+  "making it a treat",
+  "already making waves",
+  "thrilling ride",
+  "fresh and exciting",
+  "knack",
+  "—",
+];
+
+const bannedPhraseText = aiPhrases.map((p) => `"${p}"`).join(", ");
+
 // Cache for storing processed articles
 let articleCache = {
   timestamp: null,
@@ -424,6 +634,80 @@ Return ONLY a JSON object like:
   }
 }
 
+async function humanizeNews(combinedSummary, character) {
+  const personaBlock = character
+    ? `
+### NARRATOR PERSONA
+Write this summary in the voice of the following character:
+
+- Name: ${character.userName}
+- Personality traits: ${character.personalityTraits.join(", ")}
+- Mood: ${character.mood}
+- Likes: ${character.likes.join(", ")}
+- Dislikes: ${character.dislikes.join(", ")}
+- Response style: ${character.responseStyle}
+
+Stay true to this persona’s tone, but:
+- Still avoid all banned phrases.
+- Still keep it concise, readable, and news-focused.
+- Don’t mention the character directly in the text.
+`.trim()
+    : "";
+
+  const systemPrompt = `
+You are **Humanizer GPT** — your task is to rewrite news so it reads naturally, like a human wrote it.
+
+### OBJECTIVE
+Take the user's provided game news text and:
+1. Create a **headline** under 50 characters.
+2. Write a **short, scannable article** (2–4 brief paragraphs).
+
+### STYLE
+- Get straight to the point; skip fluffy intros like “Yo gamers!”.
+- Use plain, conversational language with varied sentence lengths.
+- Keep paragraphs short — 2–4 sentences max for readability.
+- Avoid AI clichés, corporate tone, or fake excitement.
+- Do **not** talk about specs, prices, or promotions.
+- It’s okay to sound opinionated or amused, but stay factual.
+- Do **not** use generic wrap-ups like “in conclusion” or “overall.”
+
+### ENGAGEMENT RULE
+End the summary with a short, **open-ended question** that invites reader opinions — something natural and relevant to the story, like:
+> "Would you try it after this update?"
+> "Is this the right move from Sony?"
+
+### BANNED PHRASES
+Do **not** use any sentence that includes or closely resembles these AI-sounding buzzwords:
+${bannedPhraseText}
+${personaBlock ? `\n${personaBlock}` : ""}
+
+### OUTPUT FORMAT
+Return **only** one JSON object, exactly like this:
+{
+  "title": "string (headline under 50 chars)",
+  "summary": "string (the article text ending with a question)"
+}
+No extra commentary or text outside the JSON.
+`.trim();
+
+  return openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    temperature: 0.7,
+    max_tokens: 1000,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      {
+        role: "user",
+        content: `Use this news text and output a JSON blob with "title" and "summary" keys: ${combinedSummary}`,
+      },
+    ],
+  });
+}
+
 // Summarize article using OpenAI
 async function summarizeArticle(fullText, url) {
   try {
@@ -476,142 +760,14 @@ async function summarizeArticle(fullText, url) {
     const platforms = await detectPlatforms(combinedSummary);
     console.log("Detected platforms:", platforms);
 
-    const aiPhrases = [
-      "provide a valuable insight",
-      "left an indelible mark",
-      "play a significant role in shaping",
-      "an unwavering commitment",
-      "a testament to",
-      "a paradigm shift",
-      "a pivotal moment",
-      "a profound impact",
-      "a remarkable achievement",
-      "a significant milestone",
-      "a striking resemblance",
-      "a unique perspective",
-      "a wealth of information",
-      "an array of options",
-      "an exceptional example",
-      "an integral part",
-      "an intricate balance",
-      "as we navigate",
-      "at the heart of",
-      "beyond the scope",
-      "by and large",
-      "carefully curated",
-      "deeply resonated",
-      "delve deeper",
-      "elevate the experience",
-      "embark on a journey",
-      "embrace the opportunity",
-      "enhance the understanding",
-      "explore the nuances",
-      "for all intents and purposes",
-      "foster a sense of",
-      "from a holistic perspective",
-      "harness the power",
-      "illuminate the path",
-      "immerse yourself",
-      "in light of",
-      "in the realm of",
-      "in this day and age",
-      "it goes without saying",
-      "it is worth noting",
-      "it's important to note",
-      "leverage the potential",
-      "myriad of options",
-      "needless to say",
-      "on the cutting edge",
-      "on the flip side",
-      "pave the way",
-      "paints a picture",
-      "particularly noteworthy",
-      "push the boundaries",
-      "require a careful consideration",
-      "essential to recognize",
-      "validate the finding",
-      "vital role in shaping",
-      "sense of camaraderie",
-      "influence various factors",
-      "make a challenge",
-      "unwavering support",
-      "importance of the address",
-      "a significant step forward",
-      "add an extra layer",
-      "address the root cause",
-      "a profound implication",
-      "contributes to understanding",
-      "beloved",
-      "highlights",
-      "delve into",
-      "navigate the landscape",
-      "foster innovation",
-      "groundbreaking advancement",
-      "in summary",
-      "shrouded in mystery",
-      "shaping up",
-      "making it a treat",
-      "already making waves",
-      "thrilling ride",
-      "fresh and exciting",
-      "knack",
-      "—",
-    ];
-
-    const bannedPhraseText = aiPhrases.map((p) => `"${p}"`).join(", ");
-
-    const finalResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 1000,
-      messages: [
-        {
-          role: "system",
-          content: `
-    You are **Humanizer GPT** — your task is to rewrite news so it reads naturally, like a human wrote it.
-    
-    ### OBJECTIVE
-    Take the user's provided game news text and:
-    1. Create a **headline** under 50 characters.
-    2. Write a **short, scannable article** (2–4 brief paragraphs).
-    
-    ### STYLE
-    - Get straight to the point; skip fluffy intros like “Yo gamers!”.
-    - Use plain, conversational language with varied sentence lengths.
-    - Keep paragraphs short — 2–4 sentences max for readability.
-    - Avoid AI clichés, corporate tone, or fake excitement.
-    - Do **not** talk about specs, prices, or promotions.
-    - It’s okay to sound opinionated or amused, but stay factual.
-    - Do **not** use generic wrap-ups like “in conclusion” or “overall.”
-    
-    ### ENGAGEMENT RULE
-    End the summary with a short, **open-ended question** that invites reader opinions — something natural and relevant to the story, like:
-    > "Would you try it after this update?"  
-    > "Is this the right move from Sony?"
-    
-    ### BANNED PHRASES
-    Do **not** use any sentence that includes or closely resembles these AI-sounding buzzwords:
-    ${bannedPhraseText}
-    
-    ### OUTPUT FORMAT
-    Return **only** one JSON object, exactly like this:
-    {
-      "title": "string (headline under 50 chars)",
-      "summary": "string (the article text ending with a question)"
+    const narrator = chooseNarrator();
+    if (narrator) {
+      console.log(`Using narrator persona: ${narrator.userName}`);
+    } else {
+      console.log("No narrator persona selected; using neutral tone.");
     }
-    No extra commentary or text outside the JSON.
-          `.trim(),
-        },
-        {
-          role: "user",
-          content: `Use this news text and output a JSON blob with "title" and "summary" keys: ${combinedSummary}`,
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 1000,
-    });
+
+    const finalResponse = await humanizeNews(combinedSummary, narrator);
 
     console.log(
       "Final summary response:",
@@ -626,7 +782,8 @@ async function summarizeArticle(fullText, url) {
       }
       return {
         ...summary,
-        platforms: platforms,
+        platforms,
+        userName: narrator ? narrator.userName : null,
       };
     } catch (err) {
       console.error("Error parsing summary response:", err);
