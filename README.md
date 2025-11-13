@@ -9,6 +9,7 @@ An intelligent news aggregator that collects, filters, and summarizes gaming new
 - Generates concise summaries with catchy titles
 - Identifies relevant gaming platforms for each article
 - Extracts and includes article images
+- Captures the first embedded X/Twitter or YouTube link when available
 - Caches results to minimize API usage
 - Runs on a scheduled basis (default: daily at 8 PM)
 - RESTful API endpoints for easy integration
@@ -85,6 +86,7 @@ Example response:
       "summary": "Concise summary of the article...",
       "sourceUrl": "https://original.article.url",
       "imageUrl": "https://image.url",
+      "socialUrl": "https://twitter.com/example/status/1234567890",
       "platforms": ["PlayStation", "Xbox", "PC"]
     }
   ]

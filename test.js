@@ -25,6 +25,7 @@ async function testAPI() {
       console.log("Title:", newsData.data[0].title);
       console.log("Summary:", newsData.data[0].summary);
       console.log("Source:", newsData.data[0].sourceUrl);
+      console.log("Social:", newsData.data[0].socialUrl || "None");
     }
   } catch (error) {
     console.error("Error testing API:", error);

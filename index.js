@@ -6,6 +6,7 @@ const { OpenAI } = require("openai");
 const { Readability } = require("@mozilla/readability");
 const { JSDOM } = require("jsdom");
 const fetch = require("node-fetch");
+const puppeteer = require("puppeteer");
 const cron = require("node-cron");
 
 // Initialize Express
@@ -521,19 +522,577 @@ async function getArticleImage(dom, url) {
   }
 }
 
+function toAbsoluteUrl(rawUrl, baseUrl) {
+  if (!rawUrl) return null;
+  const trimmed = rawUrl.trim();
+  if (
+    !trimmed ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("javascript:")
+  ) {
+    return null;
+  }
+
+  try {
+    return new URL(trimmed, baseUrl).href;
+  } catch (err) {
+    return null;
+  }
+}
+
+function normalizeYouTubeUrl(rawUrl, baseUrl) {
+  const absolute = toAbsoluteUrl(rawUrl, baseUrl);
+  if (!absolute) return null;
+
+  try {
+    const urlObj = new URL(absolute);
+    const host = urlObj.hostname.toLowerCase();
+
+    if (host.includes("youtube-nocookie.com")) {
+      return null;
+    }
+
+    if (host.includes("youtube.com")) {
+      const embedMatch = urlObj.pathname.match(/\/embed\/([^/?]+)/);
+      if (embedMatch && embedMatch[1]) {
+        return `https://www.youtube.com/watch?v=${embedMatch[1]}`;
+      }
+      const shortId = urlObj.searchParams.get("v");
+      if (shortId) {
+        return `https://www.youtube.com/watch?v=${shortId}`;
+      }
+    }
+
+    if (host === "youtu.be") {
+      const videoId = urlObj.pathname.replace(/^\/+/, "");
+      if (videoId) {
+        return `https://www.youtube.com/watch?v=${videoId}`;
+      }
+    }
+
+    return urlObj.href;
+  } catch (err) {
+    return absolute;
+  }
+}
+
+function normalizeTwitterUrl(rawUrl, baseUrl) {
+  const absolute = toAbsoluteUrl(rawUrl, baseUrl);
+  if (!absolute) return null;
+
+  try {
+    const urlObj = new URL(absolute);
+    const host = urlObj.hostname.toLowerCase();
+
+    if (host.includes("platform.twitter.com")) {
+      const tweetId =
+        urlObj.searchParams.get("id") ||
+        urlObj.searchParams.get("tweet_id") ||
+        urlObj.searchParams.get("status");
+      if (tweetId) {
+        return `https://twitter.com/i/web/status/${tweetId}`;
+      }
+    }
+
+    if (host.includes("twitter.com") || host.includes("x.com")) {
+      const statusMatch =
+        urlObj.pathname.match(/\/status(?:es)?\/(\d+)/i) ||
+        urlObj.pathname.match(/\/i\/web\/status\/(\d+)/i);
+
+      if (statusMatch && statusMatch[1]) {
+        return `https://twitter.com/i/web/status/${statusMatch[1]}`;
+      }
+
+      return null;
+    }
+
+    return absolute;
+  } catch (err) {
+    return absolute;
+  }
+}
+
+function getArticleSocialEmbed(dom, url, rawHtml = "") {
+  try {
+    const { document, NodeFilter } = dom.window;
+    const root = document.body || document.documentElement;
+    if (!root) return null;
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    let currentNode;
+
+    console.log("Scanning DOM for social embeds", { url });
+
+    while ((currentNode = walker.nextNode())) {
+      if (!(currentNode instanceof dom.window.HTMLElement)) continue;
+      const element = currentNode;
+      const tagName = element.tagName ? element.tagName.toLowerCase() : "";
+
+      // Twitter / X embeds
+      if (tagName === "blockquote") {
+        const className = element.className || "";
+        const isTwitterBlockquote =
+          /\btwitter-tweet\b/i.test(className) ||
+          element.hasAttribute("data-tweet-id");
+        if (isTwitterBlockquote) {
+          const anchor = element.querySelector(
+            'a[href*="twitter.com"], a[href*="x.com"]'
+          );
+          if (anchor && anchor.href) {
+            const normalized = normalizeTwitterUrl(anchor.href, url);
+            if (normalized) {
+              return normalized;
+            }
+          }
+        }
+      }
+
+      if (tagName === "iframe") {
+        const src =
+          element.getAttribute("src") || element.getAttribute("data-src");
+        if (src) {
+          if (/(twitter\.com|x\.com|platform\.twitter\.com)/i.test(src)) {
+            const normalized = normalizeTwitterUrl(src, url);
+            if (normalized) {
+              return normalized;
+            }
+          }
+          if (/youtube-nocookie\.com/i.test(src)) {
+            continue;
+          }
+          if (/(youtube\.com|youtu\.be)/i.test(src)) {
+            const normalized = normalizeYouTubeUrl(src, url);
+            if (normalized) {
+              return normalized;
+            }
+          }
+        }
+      }
+    }
+
+    const liteYoutube = document.querySelector("lite-youtube");
+    if (liteYoutube) {
+      const videoId =
+        liteYoutube.getAttribute("videoid") ||
+        liteYoutube.getAttribute("data-videoid");
+      if (videoId) {
+        const normalized = normalizeYouTubeUrl(videoId, url);
+        if (normalized) return normalized;
+      }
+    }
+
+    const youtubeAnchor = document.querySelector(
+      '.youtube-video a[data-url], .youtube-video a[href*="youtu"]'
+    );
+    if (youtubeAnchor) {
+      const href =
+        youtubeAnchor.getAttribute("data-url") ||
+        youtubeAnchor.getAttribute("href");
+      if (href && !/youtube-nocookie\.com/i.test(href)) {
+        const normalized = normalizeYouTubeUrl(href, url);
+        if (normalized) return normalized;
+      }
+    }
+
+    const youtubeOEmbed = document.querySelector(
+      '[data-oembed-url*="youtube"], [data-youtube-url]'
+    );
+    if (youtubeOEmbed) {
+      const candidate =
+        youtubeOEmbed.getAttribute("data-oembed-url") ||
+        youtubeOEmbed.getAttribute("data-youtube-url");
+      if (candidate && !/youtube-nocookie\.com/i.test(candidate)) {
+        const normalized = normalizeYouTubeUrl(candidate, url);
+        if (normalized) return normalized;
+      }
+    }
+
+    const twitterOEmbed = document.querySelector(
+      '[data-oembed-url*="twitter"], [data-oembed-url*="x.com"], [data-twitter-url]'
+    );
+    if (twitterOEmbed) {
+      const candidate =
+        twitterOEmbed.getAttribute("data-oembed-url") ||
+        twitterOEmbed.getAttribute("data-twitter-url");
+      if (candidate) {
+        const normalized = normalizeTwitterUrl(candidate, url);
+        if (normalized) return normalized;
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.error("Error extracting social embed from article:", err);
+  }
+
+  if (rawHtml) {
+    try {
+      const youtubeRegex =
+        /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/gi;
+      const twitterRegex =
+        /https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/[^\s"'<>]+/gi;
+
+      const youtubeMatches = rawHtml.match(youtubeRegex) || [];
+      const twitterMatches = rawHtml.match(twitterRegex) || [];
+      const uniqueUrls = [...new Set([...youtubeMatches, ...twitterMatches])];
+
+      for (const candidate of uniqueUrls) {
+        if (/youtube\.com|youtu\.be/i.test(candidate)) {
+          const normalized = normalizeYouTubeUrl(candidate, url);
+          if (normalized) return normalized;
+        }
+        if (/twitter\.com|x\.com/i.test(candidate)) {
+          const normalized = normalizeTwitterUrl(candidate, url);
+          if (normalized) return normalized;
+        }
+      }
+    } catch (err) {
+      console.error("Error scanning raw HTML for social embeds:", err);
+    }
+  }
+
+  return null;
+}
+
+function normalizeSocialLink(rawUrl, baseUrl) {
+  if (!rawUrl) return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  if (/(youtube\.com|youtu\.be)/i.test(trimmed)) {
+    return normalizeYouTubeUrl(trimmed, baseUrl);
+  }
+
+  if (/(twitter\.com|x\.com|platform\.twitter\.com)/i.test(trimmed)) {
+    return normalizeTwitterUrl(trimmed, baseUrl);
+  }
+
+  return toAbsoluteUrl(trimmed, baseUrl);
+}
+
+async function fetchRenderedHtml(url) {
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+    await page.goto(url, {
+      waitUntil: ["domcontentloaded", "networkidle2"],
+      timeout: 45000,
+    });
+
+    try {
+      await page.evaluate(async () => {
+        await new Promise((resolve) => {
+          let totalHeight = 0;
+          const distance = 800;
+          const timer = setInterval(() => {
+            const scrollHeight =
+              document.documentElement.scrollHeight ||
+              document.body.scrollHeight ||
+              0;
+            window.scrollBy(0, distance);
+            totalHeight += distance;
+
+            if (totalHeight >= scrollHeight) {
+              clearInterval(timer);
+              resolve();
+            }
+          }, 100);
+        });
+      });
+    } catch (scrollError) {
+      console.warn("Puppeteer auto-scroll failed:", scrollError);
+    }
+
+    const selectorList = [
+      'iframe[src*="youtube.com"]',
+      'iframe[src*="youtu.be"]',
+      'iframe[src*="youtube-nocookie.com"]',
+      'iframe[src*="twitter.com"]',
+      'iframe[src*="x.com"]',
+      'iframe[data-src*="youtube.com"]',
+      'iframe[data-src*="twitter.com"]',
+      'iframe[data-src*="x.com"]',
+      "blockquote.twitter-tweet",
+      ".youtube-video a[data-url]",
+      '.youtube-video a[href*="youtu"]',
+      '[data-oembed-url*="youtube"]',
+      '[data-oembed-url*="twitter"]',
+      "lite-youtube",
+    ].join(", ");
+
+    let selectorError = null;
+    const waitFor = (ms) =>
+      typeof page.waitForTimeout === "function"
+        ? page.waitForTimeout(ms)
+        : new Promise((resolve) => setTimeout(resolve, ms));
+
+    const selectorPromise = page
+      .waitForSelector(selectorList, { timeout: 10000 })
+      .catch((err) => {
+        selectorError = err;
+        return null;
+      });
+
+    await Promise.race([selectorPromise, waitFor(3000)]);
+
+    if (selectorError && !page.isClosed()) {
+      console.warn(
+        "Puppeteer selector wait error:",
+        selectorError.message || selectorError
+      );
+    }
+
+    if (page.isClosed()) {
+      return { html: null, socialUrl: null };
+    }
+
+    await waitFor(1000);
+    let pageHtml = null;
+    try {
+      pageHtml = await page.content();
+    } catch (contentError) {
+      console.warn("Error retrieving rendered page HTML:", contentError);
+    }
+
+    let socialUrl = null;
+    try {
+      socialUrl = await page.evaluate(() => {
+        const normalize = (raw) => {
+          if (!raw) return null;
+          const a = document.createElement("a");
+          a.href = raw;
+          return a.href;
+        };
+
+        const resolveYoutubeId = (id) => {
+          if (!id) return null;
+          return normalize(`https://www.youtube.com/watch?v=${id}`);
+        };
+
+        const isNoCookie = (val) =>
+          typeof val === "string" && /youtube-nocookie\.com/i.test(val);
+
+        const attributeSelectors = [
+          [
+            'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="youtube-nocookie.com"]',
+            ["src", "data-src"],
+          ],
+          [
+            'iframe[src*="twitter.com"], iframe[src*="x.com"], iframe[data-src*="twitter.com"], iframe[data-src*="x.com"]',
+            ["src", "data-src"],
+          ],
+          ["lite-youtube", ["videoid", "data-videoid"], resolveYoutubeId],
+          [".youtube-video a[data-url]", ["data-url"]],
+          ['.youtube-video a[href*="youtu"]', ["href"]],
+          [
+            '[data-oembed-url*="youtube"], [data-youtube-url]',
+            ["data-oembed-url", "data-youtube-url"],
+          ],
+          [
+            '[data-oembed-url*="twitter"], [data-oembed-url*="x.com"], [data-twitter-url]',
+            ["data-oembed-url", "data-twitter-url"],
+          ],
+        ];
+
+        for (const [selector, attrs, transform] of attributeSelectors) {
+          const element = document.querySelector(selector);
+          if (!element) continue;
+
+          for (const attr of attrs) {
+            const value = element.getAttribute(attr);
+            if (!value) continue;
+            if (isNoCookie(value)) continue;
+
+            if (transform) {
+              const transformed = transform(value);
+              if (transformed) return normalize(transformed);
+            } else {
+              const normalized = normalize(value);
+              if (normalized) return normalized;
+            }
+          }
+        }
+
+        const youtubeIframe = document.querySelector(
+          'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="youtube-nocookie.com"]'
+        );
+        if (youtubeIframe) {
+          const src =
+            youtubeIframe.getAttribute("src") ||
+            youtubeIframe.getAttribute("data-src");
+          if (src && !isNoCookie(src)) {
+            return normalize(src);
+          }
+        }
+
+        const twitterIframe = document.querySelector(
+          'iframe[src*="twitter.com"], iframe[src*="x.com"], iframe[data-src*="twitter.com"], iframe[data-src*="x.com"]'
+        );
+        if (twitterIframe) {
+          const src =
+            twitterIframe.getAttribute("src") ||
+            twitterIframe.getAttribute("data-src");
+          if (src) {
+            return normalize(src);
+          }
+        }
+
+        const blockquote = document.querySelector("blockquote.twitter-tweet");
+        if (blockquote) {
+          const anchor = blockquote.querySelector(
+            'a[href*="twitter.com"], a[href*="x.com"]'
+          );
+          if (anchor && anchor.href) {
+            return normalize(anchor.href);
+          }
+        }
+
+        const oEmbedElement = document.querySelector(
+          '[data-oembed-url*="youtube"], [data-oembed-url*="youtu.be"], [data-oembed-url*="twitter"], [data-oembed-url*="x.com"], [data-youtube-url], [data-twitter-url]'
+        );
+        if (oEmbedElement) {
+          const candidate =
+            oEmbedElement.getAttribute("data-oembed-url") ||
+            oEmbedElement.getAttribute("data-youtube-url") ||
+            oEmbedElement.getAttribute("data-twitter-url");
+          if (candidate && !isNoCookie(candidate)) {
+            return normalize(candidate);
+          }
+        }
+
+        const youtubeRegex =
+          /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtube\.com\/shorts\/|youtu\.be\/)[\w-]+/i;
+        const twitterRegex =
+          /https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/[^\s"'<>]+/i;
+        const html = document.documentElement.innerHTML;
+
+        const youtubeMatch = html.match(youtubeRegex);
+        if (youtubeMatch && youtubeMatch[0]) {
+          return normalize(youtubeMatch[0]);
+        }
+
+        const twitterMatch = html.match(twitterRegex);
+        if (twitterMatch && twitterMatch[0]) {
+          return normalize(twitterMatch[0]);
+        }
+
+        return null;
+      });
+    } catch (evaluateError) {
+      console.error(
+        "Error evaluating social embed in Puppeteer:",
+        evaluateError
+      );
+    }
+
+    const normalizedSocialUrl = normalizeSocialLink(socialUrl, url);
+
+    if (normalizedSocialUrl) {
+      console.log("Puppeteer social embed found", {
+        url,
+        socialUrl: normalizedSocialUrl,
+      });
+    } else {
+      console.log("Puppeteer social embed not found", { url });
+    }
+
+    return { html: pageHtml, socialUrl: normalizedSocialUrl };
+  } catch (err) {
+    console.error(`Error rendering ${url} with Puppeteer:`, err);
+    return null;
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeErr) {
+        console.error("Error closing Puppeteer browser:", closeErr);
+      }
+    }
+  }
+}
+
 // Extract full article text and image
 async function getArticleContent(url) {
   try {
-    const response = await fetch(url);
-    const html = await response.text();
-    const dom = new JSDOM(html, { url });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
+    let dom = null;
+    let article = null;
+    let htmlUsed = null;
+    let renderedOutput = await fetchRenderedHtml(url);
+    let renderedHtml =
+      renderedOutput && renderedOutput.html ? renderedOutput.html : null;
+    let browserSocialUrl =
+      renderedOutput && renderedOutput.socialUrl
+        ? renderedOutput.socialUrl
+        : null;
 
-    if (!article) return null;
+    if (renderedHtml) {
+      try {
+        const renderedDom = new JSDOM(renderedHtml, { url });
+        const renderedReader = new Readability(renderedDom.window.document);
+        const renderedArticle = renderedReader.parse();
+
+        if (renderedArticle) {
+          dom = renderedDom;
+          article = renderedArticle;
+          htmlUsed = renderedHtml;
+        }
+      } catch (renderErr) {
+        console.error(
+          "Error parsing rendered HTML with Readability:",
+          renderErr
+        );
+      }
+    }
+
+    if (!article) {
+      const response = await fetch(url);
+      const fallbackHtml = await response.text();
+      const fallbackDom = new JSDOM(fallbackHtml, { url });
+      const fallbackReader = new Readability(fallbackDom.window.document);
+      const fallbackArticle = fallbackReader.parse();
+
+      if (!fallbackArticle) return null;
+
+      dom = fallbackDom;
+      article = fallbackArticle;
+      htmlUsed = fallbackHtml;
+
+      if (!renderedHtml) {
+        renderedHtml = fallbackHtml;
+      }
+    }
 
     // Get the image URL
     const imageUrl = await getArticleImage(dom, url);
+    const fallbackSocialUrl = getArticleSocialEmbed(dom, url, htmlUsed || "");
+    let socialUrl = browserSocialUrl || fallbackSocialUrl;
+
+    if (browserSocialUrl && !socialUrl) {
+      console.log("Browser social URL existed but parsing returned null", {
+        url,
+        browserSocialUrl,
+      });
+    }
+
+    if (!socialUrl && renderedHtml && htmlUsed !== renderedHtml) {
+      try {
+        const renderedDom = new JSDOM(renderedHtml, { url });
+        socialUrl =
+          socialUrl ||
+          getArticleSocialEmbed(renderedDom, url, renderedHtml) ||
+          normalizeSocialLink(browserSocialUrl, url);
+      } catch (embedErr) {
+        console.error(
+          "Error extracting social embed from rendered HTML:",
+          embedErr
+        );
+      }
+    }
 
     // Limit article text to ~4000 words to stay within OpenAI's token limits
     const words = article.textContent.split(/\s+/);
@@ -543,6 +1102,7 @@ async function getArticleContent(url) {
     return {
       text: truncatedText.replace(/\s+/g, " ").replace(/\n+/g, "\n").trim(),
       imageUrl: imageUrl,
+      socialUrl: socialUrl,
     };
   } catch (err) {
     console.error(`Error extracting content from ${url}:`, err);
@@ -861,10 +1421,17 @@ async function processGameNews() {
 
           const summary = await summarizeArticle(content.text, article.url);
           if (summary) {
+            if (content.socialUrl) {
+              console.log("Attaching social URL", {
+                url: article.url,
+                socialUrl: content.socialUrl,
+              });
+            }
             return {
               ...summary,
               sourceUrl: article.url,
               imageUrl: content.imageUrl,
+              socialUrl: content.socialUrl,
             };
           }
           return null;
