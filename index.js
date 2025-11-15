@@ -773,10 +773,22 @@ function normalizeSocialLink(rawUrl, baseUrl) {
 async function fetchRenderedHtml(url) {
   let browser = null;
   try {
-    browser = await puppeteer.launch({
+    const executablePath =
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      process.env.GOOGLE_CHROME_BIN ||
+      process.env.CHROME_BIN ||
+      null;
+
+    const launchOptions = {
       headless: "new",
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    };
+
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+    }
+
+    browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
     await page.goto(url, {
