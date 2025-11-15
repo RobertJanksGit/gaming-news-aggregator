@@ -571,10 +571,12 @@ function normalizeYouTubeUrl(rawUrl, baseUrl) {
 
   try {
     const urlObj = new URL(absolute);
-    const host = urlObj.hostname.toLowerCase();
+    let host = urlObj.hostname.toLowerCase();
 
-    if (host.includes("youtube-nocookie.com")) {
-      return null;
+    const isNoCookie = host.includes("youtube-nocookie.com");
+    if (isNoCookie) {
+      host = "youtube.com";
+      urlObj.hostname = "www.youtube.com";
     }
 
     if (host.includes("youtube.com")) {
@@ -582,9 +584,19 @@ function normalizeYouTubeUrl(rawUrl, baseUrl) {
       if (embedMatch && embedMatch[1]) {
         return `https://www.youtube.com/watch?v=${embedMatch[1]}`;
       }
+      const shortsMatch = urlObj.pathname.match(/\/shorts\/([^/?]+)/);
+      if (shortsMatch && shortsMatch[1]) {
+        return `https://www.youtube.com/watch?v=${shortsMatch[1]}`;
+      }
       const shortId = urlObj.searchParams.get("v");
       if (shortId) {
         return `https://www.youtube.com/watch?v=${shortId}`;
+      }
+
+      // Fallback for links like youtube.com/<id>
+      const pathId = urlObj.pathname.replace(/^\/+/, "");
+      if (pathId && pathId !== "watch") {
+        return `https://www.youtube.com/watch?v=${pathId}`;
       }
     }
 
@@ -682,9 +694,6 @@ function getArticleSocialEmbed(dom, url, rawHtml = "") {
               return normalized;
             }
           }
-          if (/youtube-nocookie\.com/i.test(src)) {
-            continue;
-          }
           if (/(youtube\.com|youtu\.be)/i.test(src)) {
             const normalized = normalizeYouTubeUrl(src, url);
             if (normalized) {
@@ -713,7 +722,7 @@ function getArticleSocialEmbed(dom, url, rawHtml = "") {
       const href =
         youtubeAnchor.getAttribute("data-url") ||
         youtubeAnchor.getAttribute("href");
-      if (href && !/youtube-nocookie\.com/i.test(href)) {
+      if (href) {
         const normalized = normalizeYouTubeUrl(href, url);
         if (normalized) return normalized;
       }
@@ -726,7 +735,7 @@ function getArticleSocialEmbed(dom, url, rawHtml = "") {
       const candidate =
         youtubeOEmbed.getAttribute("data-oembed-url") ||
         youtubeOEmbed.getAttribute("data-youtube-url");
-      if (candidate && !/youtube-nocookie\.com/i.test(candidate)) {
+      if (candidate) {
         const normalized = normalizeYouTubeUrl(candidate, url);
         if (normalized) return normalized;
       }
@@ -911,9 +920,6 @@ async function fetchRenderedHtml(url) {
           return normalize(`https://www.youtube.com/watch?v=${id}`);
         };
 
-        const isNoCookie = (val) =>
-          typeof val === "string" && /youtube-nocookie\.com/i.test(val);
-
         const attributeSelectors = [
           [
             'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="youtube-nocookie.com"]',
@@ -943,7 +949,6 @@ async function fetchRenderedHtml(url) {
           for (const attr of attrs) {
             const value = element.getAttribute(attr);
             if (!value) continue;
-            if (isNoCookie(value)) continue;
 
             if (transform) {
               const transformed = transform(value);
@@ -962,7 +967,7 @@ async function fetchRenderedHtml(url) {
           const src =
             youtubeIframe.getAttribute("src") ||
             youtubeIframe.getAttribute("data-src");
-          if (src && !isNoCookie(src)) {
+          if (src) {
             return normalize(src);
           }
         }
@@ -997,7 +1002,7 @@ async function fetchRenderedHtml(url) {
             oEmbedElement.getAttribute("data-oembed-url") ||
             oEmbedElement.getAttribute("data-youtube-url") ||
             oEmbedElement.getAttribute("data-twitter-url");
-          if (candidate && !isNoCookie(candidate)) {
+          if (candidate) {
             return normalize(candidate);
           }
         }
