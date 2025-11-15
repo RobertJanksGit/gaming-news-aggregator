@@ -262,6 +262,23 @@ let articleCache = {
   isProcessing: false,
 };
 
+function isTruthyQueryValue(value) {
+  if (Array.isArray(value)) {
+    return value.some((item) => isTruthyQueryValue(item));
+  }
+  if (value === undefined || value === null) return false;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+}
+
+function queryEquals(value, target) {
+  if (Array.isArray(value)) {
+    return value.some((item) => queryEquals(item, target));
+  }
+  if (value === undefined || value === null) return false;
+  return String(value).trim().toLowerCase() === target.toLowerCase();
+}
+
 // Get articles from RSS feeds
 async function getLatestArticles() {
   const allArticles = [];
@@ -1375,12 +1392,12 @@ async function summarizeArticle(fullText, url) {
 }
 
 // Main process
-async function processGameNews() {
+async function processGameNews({ forceRefresh = false } = {}) {
   console.log("Starting game news processing...");
 
   // Check cache (valid for 1 hour)
   const now = new Date();
-  if (articleCache.timestamp && articleCache.data) {
+  if (!forceRefresh && articleCache.timestamp && articleCache.data) {
     const cacheAge = now - articleCache.timestamp;
     if (cacheAge < 3600000) {
       // 1 hour in milliseconds
@@ -1500,6 +1517,9 @@ app.get("/", (req, res) => {
 app.get("/api/news", async (req, res) => {
   try {
     console.log("Received request for /api/news");
+    const forceRefresh =
+      isTruthyQueryValue(req.query.refresh) ||
+      queryEquals(req.query.cache, "bypass");
 
     // If already processing, return status
     if (articleCache.isProcessing) {
@@ -1511,10 +1531,16 @@ app.get("/api/news", async (req, res) => {
     }
 
     // Start processing
-    console.log("Starting news processing...");
+    if (forceRefresh) {
+      console.log("Cache bypass requested via query params:", req.query);
+    }
+
+    console.log(
+      `Starting news processing${forceRefresh ? " (forced refresh)" : ""}...`
+    );
     articleCache.isProcessing = true;
 
-    const result = await processGameNews();
+    const result = await processGameNews({ forceRefresh });
     articleCache.data = result;
     articleCache.timestamp = new Date();
     articleCache.isProcessing = false;

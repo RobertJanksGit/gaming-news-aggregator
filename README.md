@@ -73,6 +73,7 @@ GET /api/news
 ```
 
 Returns processed news articles with summaries, platforms, and images.
+Append `?refresh=true` (or `?refresh=1`) to bypass the 1-hour cache and force a new scrape.
 
 Example response:
 
