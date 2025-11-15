@@ -105,16 +105,16 @@ The following can be configured in `index.js`:
 
 ## Deploying to Heroku (Puppeteer Support)
 
-Puppeteer needs extra system libraries that aren’t present on stock Heroku dynos. This repo ships an `Aptfile` with the required packages—just ensure the Apt buildpack runs before the Node buildpack:
+Puppeteer needs both extra system libraries **and** a Chromium binary inside the dyno.  
+This repo already ships an `Aptfile` with the required libs—just make sure the buildpacks are stacked like this:
 
 ```bash
 heroku buildpacks:add --index 1 heroku-community/apt
-heroku buildpacks:add --index 2 heroku/nodejs
+heroku buildpacks:add --index 2 jontewks/puppeteer
+heroku buildpacks:add --index 3 heroku/nodejs
 ```
 
-Deploy as usual (`git push heroku main`). During slug compilation Heroku installs the packages listed in `Aptfile`, allowing Puppeteer’s bundled Chromium to launch successfully (and enabling `socialUrl` extraction in production).
-
-If you use a custom Chrome buildpack instead, expose the binary path as `GOOGLE_CHROME_BIN` or `PUPPETEER_EXECUTABLE_PATH`; the server will automatically use it when launching Puppeteer.
+The `jontewks/puppeteer` buildpack downloads Chrome and exports `GOOGLE_CHROME_BIN`, which the app automatically uses when launching Puppeteer. After setting the buildpacks, redeploy (`git push heroku main`) so the new slug includes the browser; `socialUrl` extraction will then work in production.
 
 ## Contributing
 
