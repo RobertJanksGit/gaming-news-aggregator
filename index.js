@@ -1056,63 +1056,43 @@ async function fetchRenderedHtml(url) {
 // Extract full article text and image
 async function getArticleContent(url) {
   try {
-    let dom = null;
-    let article = null;
-    let htmlUsed = null;
-    let renderedOutput = await fetchRenderedHtml(url);
-    let renderedHtml =
-      renderedOutput && renderedOutput.html ? renderedOutput.html : null;
-    let browserSocialUrl =
-      renderedOutput && renderedOutput.socialUrl
-        ? renderedOutput.socialUrl
-        : null;
+    let browserSocialUrl = null;
+    let sourceHtml = null;
 
-    if (renderedHtml) {
-      try {
-        const renderedDom = new JSDOM(renderedHtml, {
-          url,
-          virtualConsole,
-        });
-        const renderedReader = new Readability(renderedDom.window.document);
-        const renderedArticle = renderedReader.parse();
-
-        if (renderedArticle) {
-          dom = renderedDom;
-          article = renderedArticle;
-          htmlUsed = renderedHtml;
-        }
-      } catch (renderErr) {
-        console.error(
-          "Error parsing rendered HTML with Readability:",
-          renderErr
-        );
-      }
+    const renderedOutput = await fetchRenderedHtml(url);
+    if (renderedOutput?.html) {
+      sourceHtml = renderedOutput.html;
+      browserSocialUrl = renderedOutput.socialUrl || null;
     }
 
-    if (!article) {
+    if (!sourceHtml) {
       const response = await fetch(url);
-      const fallbackHtml = await response.text();
-      const fallbackDom = new JSDOM(fallbackHtml, {
-        url,
-        virtualConsole,
-      });
-      const fallbackReader = new Readability(fallbackDom.window.document);
-      const fallbackArticle = fallbackReader.parse();
-
-      if (!fallbackArticle) return null;
-
-      dom = fallbackDom;
-      article = fallbackArticle;
-      htmlUsed = fallbackHtml;
-
-      if (!renderedHtml) {
-        renderedHtml = fallbackHtml;
-      }
+      sourceHtml = await response.text();
     }
 
-    // Get the image URL
-    const imageUrl = await getArticleImage(dom, url);
-    const fallbackSocialUrl = getArticleSocialEmbed(dom, url, htmlUsed || "");
+    if (!sourceHtml) return null;
+
+    // Parse article content with Readability using an isolated DOM
+    const readabilityDom = new JSDOM(sourceHtml, {
+      url,
+      virtualConsole,
+    });
+    const reader = new Readability(readabilityDom.window.document);
+    const article = reader.parse();
+    if (!article) return null;
+
+    // Use a fresh DOM for metadata extraction so Readability mutations
+    // don't strip out embeds and media tags
+    const metadataDom = new JSDOM(sourceHtml, {
+      url,
+      virtualConsole,
+    });
+    const imageUrl = await getArticleImage(metadataDom, url);
+    const fallbackSocialUrl = getArticleSocialEmbed(
+      metadataDom,
+      url,
+      sourceHtml || ""
+    );
     let socialUrl = browserSocialUrl || fallbackSocialUrl;
 
     if (browserSocialUrl && !socialUrl) {
@@ -1122,33 +1102,20 @@ async function getArticleContent(url) {
       });
     }
 
-    if (!socialUrl && renderedHtml && htmlUsed !== renderedHtml) {
-      try {
-        const renderedDom = new JSDOM(renderedHtml, {
-          url,
-          virtualConsole,
-        });
-        socialUrl =
-          socialUrl ||
-          getArticleSocialEmbed(renderedDom, url, renderedHtml) ||
-          normalizeSocialLink(browserSocialUrl, url);
-      } catch (embedErr) {
-        console.error(
-          "Error extracting social embed from rendered HTML:",
-          embedErr
-        );
-      }
+    if (!socialUrl && browserSocialUrl) {
+      socialUrl = normalizeSocialLink(browserSocialUrl, url);
     }
 
     // Limit article text to ~4000 words to stay within OpenAI's token limits
-    const words = article.textContent.split(/\s+/);
+    const textContent = article.textContent || "";
+    const words = textContent.split(/\s+/);
     const truncatedText = words.slice(0, 4000).join(" ");
 
     // Remove extra whitespace and normalize text
     return {
       text: truncatedText.replace(/\s+/g, " ").replace(/\n+/g, "\n").trim(),
-      imageUrl: imageUrl,
-      socialUrl: socialUrl,
+      imageUrl,
+      socialUrl,
     };
   } catch (err) {
     console.error(`Error extracting content from ${url}:`, err);
