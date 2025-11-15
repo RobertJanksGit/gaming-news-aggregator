@@ -4,7 +4,7 @@ const cors = require("cors");
 const Parser = require("rss-parser");
 const { OpenAI } = require("openai");
 const { Readability } = require("@mozilla/readability");
-const { JSDOM } = require("jsdom");
+const { JSDOM, VirtualConsole } = require("jsdom");
 const fetch = require("node-fetch");
 const puppeteer = require("puppeteer");
 const cron = require("node-cron");
@@ -261,6 +261,14 @@ let articleCache = {
   data: null,
   isProcessing: false,
 };
+
+const virtualConsole = new VirtualConsole();
+virtualConsole.on("jsdomError", (err) => {
+  if (err?.message?.includes("Could not parse CSS stylesheet")) {
+    return;
+  }
+  console.error(err);
+});
 
 function isTruthyQueryValue(value) {
   if (Array.isArray(value)) {
@@ -1061,7 +1069,10 @@ async function getArticleContent(url) {
 
     if (renderedHtml) {
       try {
-        const renderedDom = new JSDOM(renderedHtml, { url });
+        const renderedDom = new JSDOM(renderedHtml, {
+          url,
+          virtualConsole,
+        });
         const renderedReader = new Readability(renderedDom.window.document);
         const renderedArticle = renderedReader.parse();
 
@@ -1081,7 +1092,10 @@ async function getArticleContent(url) {
     if (!article) {
       const response = await fetch(url);
       const fallbackHtml = await response.text();
-      const fallbackDom = new JSDOM(fallbackHtml, { url });
+      const fallbackDom = new JSDOM(fallbackHtml, {
+        url,
+        virtualConsole,
+      });
       const fallbackReader = new Readability(fallbackDom.window.document);
       const fallbackArticle = fallbackReader.parse();
 
@@ -1110,7 +1124,10 @@ async function getArticleContent(url) {
 
     if (!socialUrl && renderedHtml && htmlUsed !== renderedHtml) {
       try {
-        const renderedDom = new JSDOM(renderedHtml, { url });
+        const renderedDom = new JSDOM(renderedHtml, {
+          url,
+          virtualConsole,
+        });
         socialUrl =
           socialUrl ||
           getArticleSocialEmbed(renderedDom, url, renderedHtml) ||
